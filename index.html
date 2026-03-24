@@ -3,6 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0d0d11">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Calendar">
+    <link rel="manifest" href="/manifest.json">
     <title>Calendar</title>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
@@ -363,12 +368,7 @@
         }
 
         /* Quick-add bar */
-        .quick-add-bar {
-            padding: 10px 18px;
-            background: rgba(255,255,255,0.38);
-            border-bottom: 1px solid var(--main-border);
-            flex-shrink: 0;
-        }
+        .quick-add-bar { display: none; }
         .quick-add-inner { display: flex; gap: 8px; }
         .quick-add-input {
             flex: 1; padding: 9px 14px;
@@ -473,20 +473,34 @@
 
         /* Event cards */
         .ev-card {
-            position: absolute; left: 3px; right: 3px;
+            position: absolute; left: 1%; width: 98%;
             border-radius: 8px; padding: 4px 7px;
             overflow: hidden; cursor: pointer;
             transition: filter 0.12s, transform 0.1s, box-shadow 0.12s;
             z-index: 2; min-height: 18px;
             border-left: 3px solid rgba(0,0,0,0.15);
+            touch-action: none;
+            user-select: none;
         }
         .ev-card:hover { filter: brightness(0.93); transform: scale(1.015); z-index: 5; box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
+        .ev-card.dragging { opacity: 0.92; box-shadow: 0 10px 24px rgba(0,0,0,0.22); z-index: 9; }
         .ev-title {
             font-size: 0.71rem; font-weight: 600; line-height: 1.3;
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
         .ev-time {
             font-size: 0.62rem; opacity: 0.72; margin-top: 1px; white-space: nowrap;
+        }
+        .weather-badge {
+            display: inline-flex; align-items: center; gap: 4px;
+            font-size: 0.64rem; color: var(--main-muted);
+            background: rgba(255,255,255,0.42); border: 1px solid rgba(0,0,0,0.06);
+            border-radius: 999px; padding: 2px 7px; margin-top: 5px;
+            white-space: nowrap;
+        }
+        .wdh-weather {
+            margin-top: 6px; display: inline-flex; align-items: center; gap: 4px;
+            font-size: 0.6rem; color: var(--main-muted); min-height: 18px;
         }
 
         /* ═══ MONTH VIEW ════════════════════════════════════════ */
@@ -521,6 +535,10 @@
             display: flex; align-items: center; justify-content: center;
             border-radius: 50%;
         }
+        .m-weather {
+            font-size: 0.62rem; color: var(--main-muted);
+            margin: 0 0 4px 1px; min-height: 14px;
+        }
         .month-cell.today-cell .m-day-num { background: var(--accent); color: #fff; }
         .m-ev-chip {
             font-size: 0.62rem; padding: 2px 5px; border-radius: 4px;
@@ -535,7 +553,7 @@
             padding: 12px 18px; background: rgba(255,255,255,0.4);
             border-bottom: 1px solid var(--main-border); flex-shrink: 0;
         }
-        .day-head-date { font-size: 1.35rem; font-weight: 700; color: var(--main-text); }
+        .day-head-date { font-size: 1.35rem; font-weight: 700; color: var(--main-text); display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
         .day-body-wrap { flex: 1; overflow-y: auto; }
         .day-body { display: flex; position: relative; min-height: calc((23 - 7) * var(--hour-h)); }
         .day-time-col {
@@ -553,6 +571,41 @@
             z-index: 200; padding: 20px;
         }
         .modal.open { display: flex; }
+        .spotlight-modal {
+            position: fixed; inset: 0; display: none; align-items: flex-start;
+            justify-content: center; padding: 9vh 18px 18px;
+            background: rgba(0,0,0,0.42); backdrop-filter: blur(6px);
+            z-index: 210;
+        }
+        .spotlight-modal.open { display: flex; }
+        .spotlight-card {
+            width: min(760px, 100%); background: rgba(255,255,255,0.96);
+            border: 1px solid rgba(0,0,0,0.08); border-radius: 18px;
+            box-shadow: 0 26px 80px rgba(0,0,0,0.28);
+            overflow: hidden; animation: floatIn 0.2s cubic-bezier(0.16,1,0.3,1);
+        }
+        .spotlight-input-row { display: flex; align-items: center; gap: 10px; padding: 14px; border-bottom: 1px solid #ececf3; }
+        .spotlight-hint {
+            width: 28px; height: 28px; border-radius: 8px; background: #f4f4fb;
+            color: #6b7280; display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0; font-size: 0.9rem;
+        }
+        .spotlight-input {
+            flex: 1; border: none; outline: none; background: transparent;
+            font: inherit; font-size: 1.02rem; color: var(--main-text);
+        }
+        .spotlight-input::placeholder { color: #9ca3af; }
+        .spotlight-actions { display: flex; align-items: center; gap: 8px; }
+        .spotlight-preview {
+            padding: 12px 14px 14px; display: grid; grid-template-columns: repeat(2,minmax(0,1fr));
+            gap: 8px;
+        }
+        .preview-pill {
+            background: #f7f7fb; border: 1px solid #ececf3; border-radius: 10px;
+            padding: 8px 10px;
+        }
+        .preview-label { font-size: 0.64rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.06em; }
+        .preview-value { font-size: 0.82rem; font-weight: 600; color: var(--main-text); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .modal-card {
             background: #fff; border-radius: 16px;
             width: min(520px, 100%); max-height: 90vh; overflow-y: auto;
@@ -670,9 +723,10 @@
             .btn-today { display: none; }
             .main-title { font-size: 0.92rem; }
             .main-topbar { padding: 0 10px; gap: 6px; }
-            .quick-add-bar { padding: 8px 10px; }
             .btn-add-ev { padding: 6px 10px; font-size: 0.78rem; }
             .view-toggle { display: none; }
+            .spotlight-modal { padding-top: 4vh; }
+            .spotlight-preview { grid-template-columns: 1fr; }
             /* Show 4 days on mobile week view */
             .week-days-head { grid-template-columns: repeat(4,1fr); }
             .week-cols { grid-template-columns: repeat(4,1fr); }
@@ -749,18 +803,6 @@
                 </div>
             </div>
 
-            <!-- Categories -->
-            <div class="sb-section">
-                <div class="sb-section-head" id="catHead">
-                    Categories <span class="chev">▾</span>
-                </div>
-                <div class="sb-section-body" id="catBody">
-                    <div class="sb-cat-item"><span class="cat-dot" style="background:#818cf8"></span>Work</div>
-                    <div class="sb-cat-item"><span class="cat-dot" style="background:#34d399"></span>Personal</div>
-                    <div class="sb-cat-item"><span class="cat-dot" style="background:#f59e0b"></span>Education</div>
-                </div>
-            </div>
-
             <div class="sidebar-footer">
                 <button class="btn-sb" id="settingsToggle" type="button">⚙ Settings</button>
                 <button class="btn-sb" id="logoutButton" type="button">↩ Sign out</button>
@@ -792,15 +834,6 @@
 
             <!-- Status -->
             <div class="status-bar" id="appStatus"></div>
-
-            <!-- Quick-add -->
-            <div class="quick-add-bar">
-                <div class="quick-add-inner">
-                    <input id="phrase" class="quick-add-input" type="text"
-                        placeholder="Add event or task — e.g. team meeting tomorrow at 10am · buy groceries Saturday">
-                    <button class="btn-quick-add" id="submitButton" type="button">Add</button>
-                </div>
-            </div>
 
             <!-- Calendar views -->
             <div class="cal-container">
@@ -845,6 +878,22 @@
         </main>
     </div>
 </section>
+
+<!-- ═══ SPOTLIGHT QUICK ADD ═════════════════════════════════ -->
+<div class="spotlight-modal" id="spotlightModal">
+    <div class="spotlight-card">
+        <div class="spotlight-input-row">
+            <div class="spotlight-hint">⌘</div>
+            <input id="phrase" class="spotlight-input" type="text" autocomplete="off"
+                placeholder="Add event or task — e.g. team meeting tomorrow at 10am · buy groceries Saturday">
+            <div class="spotlight-actions">
+                <button class="btn-quick-add" id="submitButton" type="button">Add</button>
+                <button class="icon-btn" id="closeSpotlightButton" type="button">✕</button>
+            </div>
+        </div>
+        <div class="spotlight-preview" id="phrasePreview"></div>
+    </div>
+</div>
 
 <!-- ═══ SETTINGS MODAL ════════════════════════════════════ -->
 <div class="modal" id="settingsModal">
@@ -1008,7 +1057,8 @@ const state = {
     editingItemId: null,
     currentView: 'week',
     weekStart: getWeekStart(new Date()),
-    filterEvents: true, filterTasks: true
+    filterEvents: true, filterTasks: true,
+    weatherByDate: {}
 };
 
 // Romanian + English month/weekday maps
@@ -1104,6 +1154,9 @@ const nextBtn = document.getElementById('nextBtn');
 const addEventBtn = document.getElementById('addEventBtn');
 const filterEventsEl = document.getElementById('filterEvents');
 const filterTasksEl = document.getElementById('filterTasks');
+const spotlightModal = document.getElementById('spotlightModal');
+const closeSpotlightButton = document.getElementById('closeSpotlightButton');
+const phrasePreview = document.getElementById('phrasePreview');
 
 // ============================================================
 // DATE UTILITIES
@@ -1133,6 +1186,9 @@ function formatTime(iso) {
 }
 function formatTimeRange(startIso, endIso) {
     return `${formatTime(startIso)} – ${formatTime(endIso)}`;
+}
+function formatDateShort(v) {
+    return new Intl.DateTimeFormat('en-US',{weekday:'short',month:'short',day:'numeric'}).format(v);
 }
 
 function getWeekStart(d) {
@@ -1177,7 +1233,7 @@ async function fetchWeather() {
         lon = pos.coords.longitude;
     } catch(_) {}
     try {
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&current_weather=true&forecast_days=1&timezone=auto`;
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&current_weather=true&daily=weathercode,temperature_2m_max,temperature_2m_min&forecast_days=16&timezone=auto`;
         const res = await fetch(url);
         if (!res.ok) throw new Error('weather api');
         const data = await res.json();
@@ -1191,6 +1247,21 @@ async function fetchWeather() {
                 <div class="weather-temp">${temp}°C</div>
                 <div class="weather-desc">${d}</div>
             </div>`;
+        state.weatherByDate = {};
+        if (data.daily?.time?.length) {
+            data.daily.time.forEach((day, idx) => {
+                const code = Number(data.daily.weathercode?.[idx]);
+                const dayInfo = wmoInfo(code);
+                const max = Math.round(Number(data.daily.temperature_2m_max?.[idx]));
+                const min = Math.round(Number(data.daily.temperature_2m_min?.[idx]));
+                state.weatherByDate[day] = {
+                    icon: dayInfo.i,
+                    desc: dayInfo.d,
+                    label: Number.isFinite(max) && Number.isFinite(min) ? `${max}°/${min}°` : ''
+                };
+            });
+        }
+        renderCurrentView();
         // Update timezone label
         const tzEl = document.getElementById('tzLabel');
         if (tzEl) {
@@ -1198,10 +1269,18 @@ async function fetchWeather() {
             tzEl.textContent = `GMT${offset>=0?'+':''}${offset}`;
         }
     } catch(_) {
+        state.weatherByDate = {};
         el.innerHTML = `<span class="weather-icon">🌡️</span>
             <div class="weather-info"><div class="weather-temp">—</div>
             <div class="weather-desc">Weather unavailable</div></div>`;
     }
+}
+
+function weatherBadgeMarkup(dateOrKey) {
+    const key = typeof dateOrKey === 'string' ? dateOrKey : dateKey(dateOrKey);
+    const w = state.weatherByDate[key];
+    if (!w) return '';
+    return `<span class="weather-badge">${w.icon} ${w.label || w.desc}</span>`;
 }
 
 // ============================================================
@@ -1215,6 +1294,39 @@ function setStatus(el, msg='', type='') {
     } else {
         el.style.color = type==='error'?'#ef4444':type==='success'?'#16a34a':'';
     }
+}
+
+function renderPhrasePreview() {
+    if (!phrasePreview) return;
+    const text = phraseInput?.value?.trim() || '';
+    if (!text) {
+        phrasePreview.innerHTML = `
+            <div class="preview-pill"><div class="preview-label">Title</div><div class="preview-value">—</div></div>
+            <div class="preview-pill"><div class="preview-label">Type</div><div class="preview-value">—</div></div>
+            <div class="preview-pill"><div class="preview-label">Date</div><div class="preview-value">—</div></div>
+            <div class="preview-pill"><div class="preview-label">Time</div><div class="preview-value">—</div></div>`;
+        return;
+    }
+    try {
+        const parsed = parseRomanian(text);
+        phrasePreview.innerHTML = `
+            <div class="preview-pill"><div class="preview-label">Title</div><div class="preview-value">${parsed.title}</div></div>
+            <div class="preview-pill"><div class="preview-label">Type</div><div class="preview-value">${parsed.type}</div></div>
+            <div class="preview-pill"><div class="preview-label">Date</div><div class="preview-value">${formatDateShort(parsed.start)}</div></div>
+            <div class="preview-pill"><div class="preview-label">Time</div><div class="preview-value">${parsed.allDay ? 'All day' : formatTimeRange(parsed.start, parsed.end)}</div></div>`;
+    } catch (_) {
+        phrasePreview.innerHTML = `
+            <div class="preview-pill"><div class="preview-label">Status</div><div class="preview-value">Could not parse yet</div></div>`;
+    }
+}
+
+function openSpotlight() {
+    spotlightModal?.classList.add('open');
+    renderPhrasePreview();
+    setTimeout(()=>phraseInput?.focus(), 0);
+}
+function closeSpotlight() {
+    spotlightModal?.classList.remove('open');
 }
 
 // ============================================================
@@ -1584,7 +1696,7 @@ function buildTimeCol(colEl) {
 }
 
 // ── Position events in a column ──────────────────────────
-function buildEventsInCol(colEl, items, colHeightPx) {
+function buildEventsInCol(colEl, items, colHeightPx, options={}) {
     colEl.style.position='relative';
     colEl.style.height=`${colHeightPx}px`;
     // Draw hour lines
@@ -1593,24 +1705,136 @@ function buildEventsInCol(colEl, items, colHeightPx) {
         lines+=`<div class="hour-line" style="top:${h*HOUR_H}px"></div>`;
     }
     colEl.innerHTML=lines;
-    // Place events
-    items.forEach(item=>{
+    const mapped = items.map(item=>{
         const s=new Date(item.start), e=new Date(item.end);
-        const startMin=s.getHours()*60+s.getMinutes();
-        const endMin=e.getHours()*60+e.getMinutes();
+        return {
+            item,
+            startMin: s.getHours()*60+s.getMinutes(),
+            endMin: e.getHours()*60+e.getMinutes()
+        };
+    }).sort((a,b)=>a.startMin-b.startMin||a.endMin-b.endMin);
+    const colEnds=[];
+    const placed=mapped.map(entry=>{
+        let idx=0;
+        while (idx<colEnds.length && colEnds[idx]>entry.startMin) idx++;
+        colEnds[idx]=entry.endMin;
+        return {...entry,colIdx:idx,overlapCount:1};
+    });
+    placed.forEach(p=>{
+        let maxCols=1;
+        placed.forEach(q=>{
+            const overlap = q.startMin < p.endMin && q.endMin > p.startMin;
+            if (!overlap) return;
+            maxCols = Math.max(maxCols, q.colIdx + 1);
+        });
+        p.overlapCount = Math.max(1, maxCols);
+    });
+    // Place events
+    placed.forEach(({item,startMin,endMin,colIdx,overlapCount})=>{
         const topRaw=(startMin-V_START*60)*(HOUR_H/60);
         const height=Math.max(18,(endMin-startMin)*(HOUR_H/60));
         // Skip events entirely outside the visible time range
         if (topRaw + height < 0 || topRaw >= HOURS*HOUR_H) return;
         const top=Math.max(0,topRaw);
         const color=getEvColor(item.id);
+        const widthPct=98/overlapCount;
+        const leftPct=1 + colIdx*widthPct;
         const card=document.createElement('div');
         card.className='ev-card';
-        card.style.cssText=`top:${top}px;height:${height}px;background:${color.bg};color:${color.text};border-left-color:${color.text};`;
+        card.style.cssText=`top:${top}px;height:${height}px;left:${leftPct}%;width:${Math.max(6,widthPct-0.8)}%;background:${color.bg};color:${color.text};border-left-color:${color.text};`;
         card.innerHTML=`<div class="ev-title">${item.title}</div>${height>30?`<div class="ev-time">${formatTime(item.start)}</div>`:''}`;
-        card.addEventListener('click',()=>openEditModal(item.id));
+        let moved = false;
+        if (options.enableDrag) {
+            card.addEventListener('pointerdown', e => beginDragEvent(e, card, item, colEl, options, ()=>{ moved=true; }));
+        }
+        card.addEventListener('click',()=>{ if (!moved) openEditModal(item.id); moved=false; });
         colEl.appendChild(card);
     });
+}
+
+function clamp(v,min,max) { return Math.max(min,Math.min(max,v)); }
+function roundToStep(v,step=5) { return Math.round(v/step)*step; }
+
+function beginDragEvent(e, card, item, colEl, options, markMoved) {
+    if (e.button!==0) return;
+    e.preventDefault();
+    const colRect = colEl.getBoundingClientRect();
+    const startY = e.clientY;
+    const startX = e.clientX;
+    const origTop = parseFloat(card.style.top)||0;
+    const cardHeight = parseFloat(card.style.height)||18;
+    const minTop = 0;
+    const maxTop = Math.max(0, HOURS*HOUR_H - cardHeight);
+    const startDate = new Date(item.start);
+    const endDate = new Date(item.end);
+    const durationMin = Math.max(15, Math.round((endDate.getTime()-startDate.getTime())/60000));
+    const baseDayIdx = Number(options.dayIndex || 0);
+    const weekDays = options.weekDays || [];
+    let currentTop = origTop;
+    let dayShift = 0;
+    let hasMoved = false;
+    card.classList.add('dragging');
+    card.setPointerCapture?.(e.pointerId);
+
+    const onMove = evt => {
+        const dy = evt.clientY - startY;
+        const dx = evt.clientX - startX;
+        if (Math.abs(dy) > 2 || Math.abs(dx) > 2) {
+            hasMoved = true;
+            markMoved();
+        }
+        currentTop = clamp(origTop + dy, minTop, maxTop);
+        card.style.top = `${currentTop}px`;
+        if (options.view === 'week' && weekDays.length) {
+            const shift = Math.round(dx / colRect.width);
+            dayShift = clamp(shift, -baseDayIdx, weekDays.length - baseDayIdx - 1);
+        }
+    };
+    const onUp = async evt => {
+        card.classList.remove('dragging');
+        card.releasePointerCapture?.(e.pointerId);
+        card.removeEventListener('pointermove', onMove);
+        card.removeEventListener('pointerup', onUp);
+        card.removeEventListener('pointercancel', onUp);
+        if (!hasMoved) return;
+        const minsFromStart = (currentTop / HOUR_H) * 60;
+        const startMins = roundToStep(V_START*60 + minsFromStart, 5);
+        let targetDayKey = options.dayKey;
+        if (options.view === 'week' && weekDays.length) {
+            targetDayKey = dateKey(weekDays[baseDayIdx + dayShift]);
+        }
+        await moveItemByDrag(item.id, targetDayKey, startMins, durationMin);
+    };
+    card.addEventListener('pointermove', onMove);
+    card.addEventListener('pointerup', onUp);
+    card.addEventListener('pointercancel', onUp);
+}
+
+async function moveItemByDrag(itemId, targetDayKey, startMinutes, durationMin) {
+    const item = state.remoteItems.find(it=>it.id===itemId);
+    if (!item || !targetDayKey) return;
+    const day = parseDateKey(targetDayKey);
+    const hr = Math.floor(startMinutes/60);
+    const mn = Math.max(0,startMinutes%60);
+    const startDate = new Date(day.getFullYear(), day.getMonth(), day.getDate(), hr, mn, 0, 0);
+    const endDate = addMinutes(startDate, durationMin);
+    const updated = {
+        ...item,
+        allDay: false,
+        start: startDate.toISOString(),
+        end: endDate.toISOString()
+    };
+    try {
+        await fetchJson(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(APP_CONFIG.CALENDAR_ID)}/events/${encodeURIComponent(item.id)}`,{
+            method:'PATCH',
+            headers:{Authorization:`Bearer ${state.accessToken}`,'Content-Type':'application/json'},
+            body:JSON.stringify(buildPayload(updated))
+        });
+        playSound(700,0.08);
+        await fetchMonthItems();
+    } catch (err) {
+        setStatus(appStatus,`Drag update failed: ${err.message}`,'error');
+    }
 }
 
 // ── WEEK VIEW ─────────────────────────────────────────────
@@ -1623,9 +1847,11 @@ function renderWeekView() {
     // Header
     weekDaysHead.innerHTML=days.map((d,i)=>{
         const k=dateKey(d), isToday=k===todayKey;
+        const w = state.weatherByDate[k];
         return `<div class="wdh ${isToday?'today-col':''}" data-day="${k}">
             <div class="wdh-name">${DAY_NAMES[i]}</div>
-            <div class="wdh-num">${d.getDate()}</div></div>`;
+            <div class="wdh-num">${d.getDate()}</div>
+            <div class="wdh-weather">${w?`${w.icon} ${w.label || ''}`:''}</div></div>`;
     }).join('');
     weekDaysHead.querySelectorAll('.wdh').forEach(el=>{
         el.addEventListener('click',()=>{ state.selectedDateKey=el.dataset.day; switchView('day'); });
@@ -1644,7 +1870,7 @@ function renderWeekView() {
         col.className=`week-day-col ${isToday?'today-col':''}`;
         col.style.height=`${colH}px`;
         const dayItems=filtered.filter(it=>dateKey(it.start)===k&&!it.allDay);
-        buildEventsInCol(col,dayItems,colH);
+        buildEventsInCol(col,dayItems,colH,{enableDrag:true,view:'week',dayKey:k,dayIndex:days.findIndex(x=>dateKey(x)===k),weekDays:days});
         // Now line
         if (isToday) {
             const now=new Date(), nowMin=now.getHours()*60+now.getMinutes();
@@ -1680,8 +1906,11 @@ function renderMonthView() {
             return `<div class="m-ev-chip" style="background:${c.bg};color:${c.text}" data-id="${it.id}">${it.title}</div>`;
         }).join('');
         const more=dayItems.length>3?`<div class="m-more">+${dayItems.length-3} more</div>`:'';
+        const w = state.weatherByDate[k];
+        const weather = w ? `<div class="m-weather">${w.icon} ${w.label || w.desc}</div>` : `<div class="m-weather"></div>`;
         html+=`<div class="month-cell ${isToday?'today-cell':''} ${isOther?'other-month':''}" data-day="${k}">
             <div class="m-day-num">${cur.getDate()}</div>
+            ${weather}
             ${chips}${more}</div>`;
     }
     monthGrid.innerHTML=html;
@@ -1697,10 +1926,10 @@ function renderMonthView() {
 // ── DAY VIEW ──────────────────────────────────────────────
 function renderDayView() {
     const d=parseDateKey(state.selectedDateKey);
-    dayHeadDate.textContent=formatLabel(d);
+    dayHeadDate.innerHTML=`<span>${formatLabel(d)}</span>${weatherBadgeMarkup(state.selectedDateKey)}`;
     buildTimeCol(dayTimeCol);
     const filtered=getFilteredItems().filter(it=>dateKey(it.start)===state.selectedDateKey&&!it.allDay);
-    buildEventsInCol(dayEventsCol,filtered,HOURS*HOUR_H);
+    buildEventsInCol(dayEventsCol,filtered,HOURS*HOUR_H,{enableDrag:true,view:'day',dayKey:state.selectedDateKey});
     // Now line
     const todayKey=dateKey(new Date());
     if (state.selectedDateKey===todayKey) {
@@ -1813,10 +2042,12 @@ async function createItemFromInput() {
             body:JSON.stringify(payload)
         });
         phraseInput.value='';
+        renderPhrasePreview();
         setStatus(appStatus,'Added!','success');
         playSound(parsed.type==='task'?620:820);
         setTimeout(()=>setStatus(appStatus,'',''),3000);
         await fetchMonthItems();
+        closeSpotlight();
         phraseInput.focus();
     } catch(e) { setStatus(appStatus,`Could not add: ${e.message}`,'error'); }
 }
@@ -2037,7 +2268,18 @@ document.querySelectorAll('.view-btn').forEach(btn=>{
 });
 
 // Add event button – focus quick-add
-addEventBtn.addEventListener('click',()=>phraseInput.focus());
+addEventBtn.addEventListener('click',openSpotlight);
+closeSpotlightButton?.addEventListener('click',closeSpotlight);
+spotlightModal?.addEventListener('click',e=>{ if (e.target===spotlightModal) closeSpotlight(); });
+phraseInput?.addEventListener('input',renderPhrasePreview);
+document.addEventListener('keydown',e=>{
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase()==='k') {
+        e.preventDefault();
+        openSpotlight();
+    } else if (e.key==='Escape' && spotlightModal?.classList.contains('open')) {
+        closeSpotlight();
+    }
+});
 
 // Mobile menu
 menuToggle.addEventListener('click',()=>{
@@ -2050,7 +2292,7 @@ sbOverlay.addEventListener('click',()=>{
 });
 
 // Sidebar collapsible sections
-[['myCalHead','myCalBody'],['catHead','catBody']].forEach(([headId,bodyId])=>{
+[['myCalHead','myCalBody']].forEach(([headId,bodyId])=>{
     const head=document.getElementById(headId), body=document.getElementById(bodyId);
     if (!head||!body) return;
     head.addEventListener('click',()=>{
@@ -2075,10 +2317,14 @@ renderCalendar();
 
 // Initial placeholder renders
 if (weekView) renderWeekView();
+renderPhrasePreview();
 
 window.addEventListener('load',()=>{
     initGoogle();
     maybeRestoreSession();
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js').catch(()=>{});
+    }
 });
 
 // Refresh now-line every minute
