@@ -1,0 +1,2070 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calendar AI</title>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <style>
+        :root {
+            --bg: #09090b;
+            --sidebar: #0a0a0d;
+            --surface: #111116;
+            --surface2: #18181e;
+            --border: #27272e;
+            --border-soft: #1c1c22;
+            --text: #f4f4f5;
+            --muted: #71717a;
+            --muted2: #52525b;
+            --event: #38bdf8;
+            --task: #34d399;
+            --danger: #f87171;
+            --accent: #818cf8;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            font-size: 14px;
+        }
+
+        /* ─── AUTH ─────────────────────────────── */
+        #authView {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 24px;
+        }
+
+        .login-card {
+            width: min(340px, 100%);
+            text-align: center;
+            animation: fadeUp 0.4s ease;
+        }
+
+        .login-icon {
+            width: 52px;
+            height: 52px;
+            margin: 0 auto 20px;
+            background: var(--accent);
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+        }
+
+        .login-card h1 {
+            font-size: 1.6rem;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            margin-bottom: 6px;
+        }
+
+        .login-card p {
+            color: var(--muted);
+            font-size: 0.85rem;
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+
+        .btn-login {
+            width: 100%;
+            padding: 11px 18px;
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font: inherit;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.15s, transform 0.1s;
+        }
+
+        .btn-login:hover { opacity: 0.9; }
+        .btn-login:active { transform: scale(0.98); }
+
+        /* ─── APP SHELL ─────────────────────────── */
+        #appView {
+            display: none;
+            height: 100vh;
+        }
+
+        .shell {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* ─── SIDEBAR ───────────────────────────── */
+        .sidebar {
+            width: 248px;
+            flex-shrink: 0;
+            background: var(--sidebar);
+            border-right: 1px solid var(--border-soft);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            animation: slideIn 0.3s ease;
+        }
+
+        .sidebar-profile {
+            padding: 16px;
+            border-bottom: 1px solid var(--border-soft);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .avatar-wrap {
+            position: relative;
+            width: 34px;
+            height: 34px;
+            flex-shrink: 0;
+        }
+
+        .avatar-bg {
+            position: absolute;
+            inset: 0;
+            border-radius: 10px;
+            background: linear-gradient(135deg, var(--accent) 0%, var(--event) 100%);
+        }
+
+        .avatar-img {
+            position: absolute;
+            inset: 0;
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            object-fit: cover;
+        }
+
+        .profile-info { min-width: 0; }
+
+        .profile-name {
+            font-size: 0.82rem;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .profile-email-sidebar {
+            font-size: 0.7rem;
+            color: var(--muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .sidebar-section {
+            padding: 14px 14px 10px;
+        }
+
+        .sidebar-section-label {
+            font-size: 0.62rem;
+            font-weight: 700;
+            letter-spacing: 0.09em;
+            text-transform: uppercase;
+            color: var(--muted2);
+            margin-bottom: 10px;
+        }
+
+        /* ─── MINI CALENDAR ─────────────────────── */
+        .cal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .cal-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: capitalize;
+            color: var(--text);
+        }
+
+        .cal-nav-btns {
+            display: flex;
+            gap: 3px;
+        }
+
+        .cal-nav-btn {
+            width: 22px;
+            height: 22px;
+            border-radius: 5px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--muted);
+            font-size: 0.85rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.12s;
+            padding: 0;
+            font: inherit;
+        }
+
+        .cal-nav-btn:hover {
+            background: var(--surface2);
+            color: var(--text);
+        }
+
+        .cal-weekdays {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            margin-bottom: 3px;
+        }
+
+        .cal-wd {
+            text-align: center;
+            font-size: 0.6rem;
+            font-weight: 700;
+            color: var(--muted2);
+            padding: 3px 0;
+        }
+
+        .cal-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 2px;
+            transition: opacity 0.18s ease;
+        }
+
+        .cal-grid.fade-out { opacity: 0; }
+
+        .cal-day {
+            aspect-ratio: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-radius: 5px;
+            font-size: 0.7rem;
+            font-weight: 500;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: background 0.1s;
+            background: transparent;
+            color: var(--text);
+            gap: 1px;
+            padding: 0;
+            font: inherit;
+            font-size: 0.7rem;
+        }
+
+        .cal-day:hover { background: var(--surface2); }
+        .cal-day.muted { color: var(--muted2); opacity: 0.4; }
+        .cal-day.today { color: var(--accent); font-weight: 700; }
+        .cal-day.selected { background: var(--accent); color: #fff; }
+        .cal-day.selected.today { color: #fff; }
+
+        .cal-dots {
+            display: flex;
+            gap: 2px;
+            height: 5px;
+            align-items: center;
+        }
+
+        .dot {
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .dot.event { background: var(--event); }
+        .dot.task { background: var(--task); }
+
+        .legend-row {
+            display: flex;
+            gap: 12px;
+            padding-top: 10px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.72rem;
+            color: var(--muted);
+        }
+
+        .dot-lg {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+        }
+
+        .sidebar-footer {
+            margin-top: auto;
+            padding: 10px;
+            border-top: 1px solid var(--border-soft);
+            display: flex;
+            gap: 4px;
+        }
+
+        .btn-sidebar {
+            flex: 1;
+            padding: 8px 6px;
+            background: transparent;
+            color: var(--muted);
+            border: 1px solid transparent;
+            border-radius: 7px;
+            font: inherit;
+            font-size: 0.78rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.12s;
+            text-align: center;
+        }
+
+        .btn-sidebar:hover {
+            background: var(--surface2);
+            color: var(--text);
+            border-color: var(--border);
+        }
+
+        /* ─── MAIN ──────────────────────────────── */
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-width: 0;
+            animation: fadeIn 0.25s ease;
+        }
+
+        .main-topbar {
+            padding: 0 20px;
+            height: 48px;
+            border-bottom: 1px solid var(--border-soft);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+            gap: 12px;
+        }
+
+        .main-date-label {
+            font-size: 0.88rem;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+        }
+
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .count-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 3px 9px;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            font-size: 0.72rem;
+            color: var(--muted);
+        }
+
+        .filter-label {
+            font-size: 0.75rem;
+            color: var(--muted2);
+        }
+
+        /* ─── INPUT AREA ────────────────────────── */
+        .input-area {
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--border-soft);
+            flex-shrink: 0;
+        }
+
+        .input-compose {
+            display: flex;
+            gap: 8px;
+            align-items: stretch;
+        }
+
+        .input-compose input {
+            flex: 1;
+            padding: 9px 14px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font: inherit;
+            font-size: 0.88rem;
+            outline: none;
+            transition: border-color 0.15s;
+            min-width: 0;
+        }
+
+        .input-compose input::placeholder { color: var(--muted); }
+        .input-compose input:focus { border-color: var(--accent); }
+
+        .btn-add {
+            padding: 9px 16px;
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font: inherit;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: opacity 0.15s, transform 0.1s;
+        }
+
+        .btn-add:hover { opacity: 0.88; }
+        .btn-add:active { transform: scale(0.97); }
+
+        /* ─── STATUS ────────────────────────────── */
+        .status {
+            display: none;
+            padding: 7px 20px;
+            font-size: 0.8rem;
+            border-bottom: 1px solid transparent;
+            flex-shrink: 0;
+        }
+
+        .status.success {
+            display: block;
+            color: var(--task);
+            background: rgba(52, 211, 153, 0.07);
+            border-color: rgba(52, 211, 153, 0.15);
+        }
+
+        .status.error {
+            display: block;
+            color: var(--danger);
+            background: rgba(248, 113, 113, 0.07);
+            border-color: rgba(248, 113, 113, 0.15);
+        }
+
+        /* ─── LIST AREA ─────────────────────────── */
+        .list-area {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .item-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px;
+            border-bottom: 1px solid var(--border-soft);
+            transition: background 0.1s;
+            animation: fadeUp 0.3s ease both;
+        }
+
+        .item-row:hover { background: var(--surface); }
+
+        .item-stripe {
+            width: 3px;
+            min-height: 30px;
+            border-radius: 2px;
+            flex-shrink: 0;
+            align-self: stretch;
+        }
+
+        .item-row.event .item-stripe { background: var(--event); }
+        .item-row.task .item-stripe { background: var(--task); }
+
+        .item-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .item-title {
+            font-size: 0.88rem;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 2px;
+        }
+
+        .item-meta-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .item-time {
+            font-size: 0.72rem;
+            color: var(--muted);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .item-loc {
+            font-size: 0.72rem;
+            color: var(--muted2);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 140px;
+        }
+
+        .item-type-badge {
+            font-size: 0.62rem;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            padding: 2px 7px;
+            border-radius: 4px;
+            flex-shrink: 0;
+        }
+
+        .item-row.event .item-type-badge {
+            background: rgba(56, 189, 248, 0.1);
+            color: var(--event);
+        }
+
+        .item-row.task .item-type-badge {
+            background: rgba(52, 211, 153, 0.1);
+            color: var(--task);
+        }
+
+        .item-actions-row {
+            display: flex;
+            gap: 4px;
+            opacity: 0;
+            transition: opacity 0.12s;
+            flex-shrink: 0;
+        }
+
+        .item-row:hover .item-actions-row { opacity: 1; }
+
+        .icon-btn {
+            width: 27px;
+            height: 27px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: var(--surface2);
+            color: var(--muted);
+            cursor: pointer;
+            font-size: 0.78rem;
+            transition: all 0.12s;
+            padding: 0;
+            font: inherit;
+        }
+
+        .icon-btn:hover { color: var(--text); background: var(--surface); }
+        .icon-btn.danger:hover { color: var(--danger); border-color: rgba(248,113,113,0.3); background: rgba(248,113,113,0.06); }
+
+        .empty-state {
+            padding: 48px 20px;
+            text-align: center;
+            color: var(--muted);
+        }
+
+        .empty-state-icon { font-size: 2.2rem; margin-bottom: 10px; opacity: 0.4; }
+        .empty-state p { font-size: 0.85rem; }
+
+        /* ─── MODALS ────────────────────────────── */
+        .modal {
+            position: fixed;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 200;
+            padding: 20px;
+        }
+
+        .modal.open { display: flex; }
+
+        .modal-card {
+            background: #111116;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            width: min(520px, 100%);
+            max-height: 90vh;
+            overflow-y: auto;
+            animation: floatIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .modal-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 18px;
+            border-bottom: 1px solid var(--border-soft);
+        }
+
+        .modal-head-title {
+            font-size: 0.88rem;
+            font-weight: 700;
+        }
+
+        .modal-body { padding: 18px; }
+
+        /* ─── SETTINGS ──────────────────────────── */
+        .settings-block { margin-bottom: 22px; }
+
+        .settings-block-title {
+            font-size: 0.63rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--muted2);
+            margin-bottom: 10px;
+        }
+
+        .setting-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border-soft);
+        }
+
+        .setting-row:last-child { border-bottom: none; }
+
+        .setting-row label, .setting-row span {
+            font-size: 0.84rem;
+            color: var(--text);
+        }
+
+        .profile-box {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 0 14px;
+        }
+
+        /* ─── FORM INPUTS ───────────────────────── */
+        input[type="text"],
+        input[type="date"],
+        input[type="time"],
+        input[type="number"],
+        select {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 7px;
+            padding: 8px 11px;
+            font: inherit;
+            font-size: 0.84rem;
+            color: var(--text);
+            outline: none;
+            transition: border-color 0.15s;
+            width: 100%;
+        }
+
+        input:focus, select:focus { border-color: var(--accent); }
+
+        input[type="checkbox"] {
+            width: 15px;
+            height: 15px;
+            accent-color: var(--accent);
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .form-grid > .full { grid-column: span 2; }
+
+        .field-label {
+            font-size: 0.72rem;
+            color: var(--muted);
+            margin-bottom: 4px;
+        }
+
+        /* ─── UTILITY ───────────────────────────── */
+        .hidden { display: none !important; }
+
+        .btn-sm {
+            padding: 7px 13px;
+            background: var(--surface2);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 7px;
+            font: inherit;
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.12s;
+        }
+
+        .btn-sm:hover { background: #27272e; border-color: #3f3f48; }
+
+        .btn-accent {
+            padding: 8px 16px;
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: 7px;
+            font: inherit;
+            font-size: 0.84rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.12s;
+        }
+
+        .btn-accent:hover { opacity: 0.88; }
+
+        .btn-danger {
+            color: var(--danger) !important;
+            border-color: rgba(248,113,113,0.25) !important;
+        }
+
+        /* ─── SCROLLBAR ─────────────────────────── */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+        /* ─── ANIMATIONS ────────────────────────── */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-12px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        @keyframes floatIn {
+            from { opacity: 0; transform: translateY(10px) scale(0.97); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        body.reduced-motion *, body.reduced-motion *::before, body.reduced-motion *::after {
+            animation: none !important;
+            transition: none !important;
+        }
+
+        /* ─── RESPONSIVE ────────────────────────── */
+        @media (max-width: 680px) {
+            .sidebar { display: none; }
+            .item-row { padding: 10px 14px; }
+            .input-area, .main-topbar { padding-left: 14px; padding-right: 14px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ═══ AUTH ════════════════════════════════════════════ -->
+<section id="authView">
+    <div class="login-card">
+        <div class="login-icon">📅</div>
+        <h1>Calendar AI</h1>
+        <p>Scrie în română ce vrei să faci —<br>noi ne ocupăm de tot restul.</p>
+        <button class="btn-login" id="loginButton" type="button">Continuă cu Google</button>
+        <div class="status" id="authStatus" style="margin-top:12px;border-radius:7px;border:1px solid;padding:8px 12px;"></div>
+    </div>
+</section>
+
+<!-- ═══ APP ══════════════════════════════════════════════ -->
+<section id="appView">
+    <div class="shell">
+
+        <!-- SIDEBAR -->
+        <aside class="sidebar">
+            <div class="sidebar-profile">
+                <div class="avatar-wrap">
+                    <div class="avatar-bg"></div>
+                    <img id="profilePhoto" class="avatar-img hidden" alt="">
+                </div>
+                <div class="profile-info">
+                    <div class="profile-name" id="sessionLabel">Calendar AI</div>
+                    <div class="profile-email-sidebar" id="profileEmail"></div>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-section-label">Calendar</div>
+                <div class="cal-header">
+                    <span class="cal-title" id="calendarTitle">—</span>
+                    <div class="cal-nav-btns">
+                        <button class="cal-nav-btn" id="prevMonthButton" type="button">‹</button>
+                        <button class="cal-nav-btn" id="nextMonthButton" type="button">›</button>
+                    </div>
+                </div>
+                <div class="cal-weekdays">
+                    <div class="cal-wd">Lu</div>
+                    <div class="cal-wd">Ma</div>
+                    <div class="cal-wd">Mi</div>
+                    <div class="cal-wd">Jo</div>
+                    <div class="cal-wd">Vi</div>
+                    <div class="cal-wd">Sâ</div>
+                    <div class="cal-wd">Du</div>
+                </div>
+                <div class="cal-grid" id="calendarGrid"></div>
+
+                <div class="legend-row">
+                    <span class="legend-item"><span class="dot-lg dot event"></span>Eveniment</span>
+                    <span class="legend-item"><span class="dot-lg dot task"></span>Task</span>
+                </div>
+            </div>
+
+            <div class="sidebar-footer">
+                <button class="btn-sidebar" id="settingsToggle" type="button">⚙ Setări</button>
+                <button class="btn-sidebar" id="logoutButton" type="button">↩ Ieși</button>
+            </div>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <main class="main">
+            <div class="main-topbar">
+                <span class="main-date-label" id="selectedDateLabel">Astăzi</span>
+                <div class="topbar-right">
+                    <span class="count-pill">
+                        <span class="dot event"></span>
+                        <span id="listMeta">0</span>
+                    </span>
+                    <span class="filter-label" id="filterMeta"></span>
+                </div>
+            </div>
+
+            <div class="input-area">
+                <div class="input-compose">
+                    <input id="phrase" type="text" placeholder="Ex: mâine la 12 cumpăr legume · weekend la service · peste 20min fac mâncare">
+                    <button class="btn-add" id="submitButton" type="button">Adaugă</button>
+                </div>
+            </div>
+
+            <div class="status" id="appStatus"></div>
+
+            <div class="list-area">
+                <div id="items"></div>
+            </div>
+        </main>
+
+    </div>
+</section>
+
+<!-- ═══ SETTINGS MODAL ═══════════════════════════════════ -->
+<div class="modal" id="settingsModal">
+    <div class="modal-card" style="width:min(560px,100%)">
+        <div class="modal-head">
+            <span class="modal-head-title">Setări</span>
+            <button class="icon-btn" id="closeSettingsButton" type="button">✕</button>
+        </div>
+        <div class="modal-body">
+
+            <div class="settings-block">
+                <div class="settings-block-title">Profil</div>
+                <div class="profile-box">
+                    <img class="avatar-img hidden" id="settingsPhoto" alt="" style="position:relative;width:38px;height:38px;border-radius:10px;object-fit:cover;">
+                    <div>
+                        <div style="font-size:0.87rem;font-weight:600;" id="profileName">—</div>
+                        <div style="font-size:0.75rem;color:var(--muted);">Google</div>
+                    </div>
+                </div>
+                <div style="margin-bottom:4px;" class="field-label">Nome afișat</div>
+                <input id="displayNameSetting" type="text" placeholder="Lăsați gol pentru a folosi numele Google">
+            </div>
+
+            <div class="settings-block">
+                <div class="settings-block-title">Afișare</div>
+                <div class="setting-row">
+                    <span>Animații</span>
+                    <input id="animationsSetting" type="checkbox">
+                </div>
+                <div class="setting-row">
+                    <span>Afișează toată luna</span>
+                    <input id="showMonthSetting" type="checkbox">
+                </div>
+                <div style="padding-top:10px;">
+                    <button class="btn-sm" id="todayButton" type="button">Salt la astăzi</button>
+                </div>
+            </div>
+
+            <div class="settings-block">
+                <div class="settings-block-title">Sunete</div>
+                <div class="setting-row">
+                    <span>Sunete active</span>
+                    <input id="soundEnabledSetting" type="checkbox">
+                </div>
+                <div class="setting-row">
+                    <span>Volum (0–1)</span>
+                    <input id="soundVolumeSetting" type="number" min="0" max="1" step="0.05" style="width:72px;">
+                </div>
+                <div style="padding-top:10px;">
+                    <button class="btn-sm" id="testSoundButton" type="button">Test sunet</button>
+                </div>
+            </div>
+
+            <div class="settings-block">
+                <div class="settings-block-title">Notificări & Calendar</div>
+                <div class="setting-row">
+                    <span>Notificări web</span>
+                    <input id="notificationsSetting" type="checkbox">
+                </div>
+                <div class="setting-row">
+                    <span>Lead minute</span>
+                    <input id="notificationLeadSetting" type="number" min="1" max="120" style="width:72px;">
+                </div>
+                <div class="setting-row">
+                    <span>Durată implicită (min)</span>
+                    <input id="defaultDurationSetting" type="number" min="15" max="480" step="15" style="width:72px;">
+                </div>
+                <div class="setting-row" style="border-bottom:none;">
+                    <span>Prefix task</span>
+                    <input id="taskPrefixSetting" type="text" style="width:130px;">
+                </div>
+                <div style="padding-top:10px;display:flex;gap:8px;">
+                    <button class="btn-sm" id="notificationPermissionButton" type="button">Permite notificări</button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- ═══ EDIT MODAL ════════════════════════════════════════ -->
+<div class="modal" id="editModal">
+    <div class="modal-card">
+        <div class="modal-head">
+            <span class="modal-head-title">Editare</span>
+            <button class="icon-btn" id="closeEditButton" type="button">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-grid">
+                <div class="full">
+                    <div class="field-label">Titlu</div>
+                    <input id="editTitle" type="text" placeholder="Titlu eveniment / task">
+                </div>
+                <div>
+                    <div class="field-label">Tip</div>
+                    <select id="editType">
+                        <option value="event">Eveniment</option>
+                        <option value="task">Task</option>
+                    </select>
+                </div>
+                <div>
+                    <div class="field-label">Locație</div>
+                    <input id="editLocation" type="text" placeholder="Locație">
+                </div>
+                <div>
+                    <div class="field-label">Data</div>
+                    <input id="editDate" type="date">
+                </div>
+                <div>
+                    <div class="field-label">Ora</div>
+                    <input id="editTime" type="time">
+                </div>
+            </div>
+            <div class="setting-row" style="margin-bottom:16px;">
+                <span>Toată ziua</span>
+                <input id="editAllDay" type="checkbox">
+            </div>
+            <div style="display:flex;gap:8px;">
+                <button class="btn-accent" id="saveEditButton" type="button">Salvează</button>
+                <button class="btn-sm btn-danger" id="deleteEditButton" type="button">Șterge</button>
+            </div>
+            <div class="status" id="editStatus" style="margin-top:10px;border-radius:7px;border:1px solid;padding:8px 12px;"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+const APP_CONFIG = {
+            GOOGLE_CLIENT_ID: '316906039508-5fe3accmshpol40r8n7sfgchv8j2m4qq.apps.googleusercontent.com',
+            CALENDAR_ID: 'primary',
+            TIMEZONE: 'Europe/Bucharest'
+        };
+
+        const STORAGE_KEYS = {
+            session: 'calendar-ai-ro-session',
+            settings: 'calendar-ai-ro-settings'
+        };
+
+        const defaultSettings = {
+            displayName: '',
+            animations: true,
+            showMonthItems: false,
+            soundEnabled: true,
+            soundVolume: 0.18,
+            notificationsEnabled: false,
+            notificationLeadMinutes: 10,
+            defaultDuration: 60,
+            taskPrefix: '[Task] '
+        };
+
+        const state = {
+            accessToken: '',
+            expiresAt: 0,
+            profile: null,
+            wantsSession: false,
+            tokenClient: null,
+            settings: { ...defaultSettings },
+            remoteItems: [],
+            selectedDateKey: dateKey(new Date()),
+            visibleMonth: startOfMonth(new Date()),
+            loadedMonthKey: '',
+            notificationTimers: [],
+            editingItemId: null
+        };
+
+        const months = {
+            ianuarie: 0, februarie: 1, martie: 2, aprilie: 3, mai: 4, iunie: 5,
+            iulie: 6, august: 7, septembrie: 8, octombrie: 9, noiembrie: 10, decembrie: 11
+        };
+
+        const weekdays = {
+            luni: 1, marti: 2, marți: 2, miercuri: 3, joi: 4, vineri: 5, sambata: 6, sâmbătă: 6, duminica: 7, duminică: 7
+        };
+
+        const authView = document.getElementById('authView');
+        const appView = document.getElementById('appView');
+        const loginButton = document.getElementById('loginButton');
+        const logoutButton = document.getElementById('logoutButton');
+        const settingsToggle = document.getElementById('settingsToggle');
+        const settingsModal = document.getElementById('settingsModal');
+        const closeSettingsButton = document.getElementById('closeSettingsButton');
+        const authStatus = document.getElementById('authStatus');
+        const appStatus = document.getElementById('appStatus');
+        const editStatus = document.getElementById('editStatus');
+        const phraseInput = document.getElementById('phrase');
+        const submitButton = document.getElementById('submitButton');
+        const sessionLabel = document.getElementById('sessionLabel');
+        const selectedDateLabel = document.getElementById('selectedDateLabel');
+        const listMeta = document.getElementById('listMeta');
+        const filterMeta = document.getElementById('filterMeta');
+        const itemsBox = document.getElementById('items');
+        const calendarTitle = document.getElementById('calendarTitle');
+        const calendarGrid = document.getElementById('calendarGrid');
+        const prevMonthButton = document.getElementById('prevMonthButton');
+        const nextMonthButton = document.getElementById('nextMonthButton');
+        const todayButton = document.getElementById('todayButton');
+        const notificationPermissionButton = document.getElementById('notificationPermissionButton');
+        const profilePhoto = document.getElementById('profilePhoto');
+        const profileName = document.getElementById('profileName');
+        const profileEmail = document.getElementById('profileEmail');
+        const displayNameSetting = document.getElementById('displayNameSetting');
+        const animationsSetting = document.getElementById('animationsSetting');
+        const showMonthSetting = document.getElementById('showMonthSetting');
+        const soundEnabledSetting = document.getElementById('soundEnabledSetting');
+        const soundVolumeSetting = document.getElementById('soundVolumeSetting');
+        const notificationsSetting = document.getElementById('notificationsSetting');
+        const notificationLeadSetting = document.getElementById('notificationLeadSetting');
+        const defaultDurationSetting = document.getElementById('defaultDurationSetting');
+        const taskPrefixSetting = document.getElementById('taskPrefixSetting');
+        const testSoundButton = document.getElementById('testSoundButton');
+        const editModal = document.getElementById('editModal');
+        const closeEditButton = document.getElementById('closeEditButton');
+        const saveEditButton = document.getElementById('saveEditButton');
+        const deleteEditButton = document.getElementById('deleteEditButton');
+        const editTitle = document.getElementById('editTitle');
+        const editType = document.getElementById('editType');
+        const editDate = document.getElementById('editDate');
+        const editTime = document.getElementById('editTime');
+        const editLocation = document.getElementById('editLocation');
+        const editAllDay = document.getElementById('editAllDay');
+
+        function startOfMonth(date) {
+            return new Date(date.getFullYear(), date.getMonth(), 1);
+        }
+
+        function endOfMonth(date) {
+            return new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
+        }
+
+        function shiftMonth(date, delta) {
+            return new Date(date.getFullYear(), date.getMonth() + delta, 1);
+        }
+
+        function dateKey(value) {
+            const date = value instanceof Date ? value : new Date(value);
+            return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+        }
+
+        function parseDateKey(key) {
+            const [year, month, day] = key.split('-').map(Number);
+            return new Date(year, month - 1, day);
+        }
+
+        function pad(value) {
+            return String(value).padStart(2, '0');
+        }
+
+        function formatMonth(date) {
+            return new Intl.DateTimeFormat('ro-RO', { month: 'long', year: 'numeric' }).format(date);
+        }
+
+        function formatLabel(date) {
+            return new Intl.DateTimeFormat('ro-RO', { day: '2-digit', month: 'long', year: 'numeric' }).format(date);
+        }
+
+        function formatItemDate(iso, allDay) {
+            const date = new Date(iso);
+            const options = allDay
+                ? { day: '2-digit', month: '2-digit' }
+                : { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' };
+            return new Intl.DateTimeFormat('ro-RO', options).format(date);
+        }
+
+        function setStatus(element, message = '', type = '') {
+            element.textContent = message;
+            element.className = type ? `status ${type}` : 'status';
+        }
+
+        function normalize(input) {
+            return input
+                .trim()
+                .toLowerCase()
+                .replace(/[„”"']/g, ' ')
+                .replace(/ş/g, 'ș')
+                .replace(/ţ/g, 'ț')
+                .replace(/\s+/g, ' ')
+                .trim();
+        }
+
+        function titleCase(text) {
+            return text
+                .split(/\s+/)
+                .filter(Boolean)
+                .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+                .join(' ');
+        }
+
+        function setTime(date, hour, minute) {
+            const next = new Date(date);
+            next.setHours(hour, minute, 0, 0);
+            return next;
+        }
+
+        function addMinutes(date, minutes) {
+            return new Date(date.getTime() + minutes * 60000);
+        }
+
+        function nextWeekday(reference, weekday, skipCurrentWeek = false) {
+            const current = reference.getDay() === 0 ? 7 : reference.getDay();
+            let daysUntil = weekday - current;
+            if (daysUntil < 0 || (daysUntil === 0 && !skipCurrentWeek)) {
+                daysUntil += 7;
+            }
+            if (skipCurrentWeek && daysUntil === 0) {
+                daysUntil = 7;
+            }
+            if (daysUntil === 0) {
+                daysUntil = 7;
+            }
+            const next = new Date(reference);
+            next.setDate(reference.getDate() + daysUntil);
+            return next;
+        }
+
+        function extractDuration(work) {
+            let duration = state.settings.defaultDuration;
+            const match = work.match(/\b(?:pentru|timp de)\s+(\d{1,3})\s*(minute|minut|min|ore|ora|oră)\b/u);
+            if (match) {
+                const amount = Number(match[1]);
+                duration = /or/.test(match[2]) ? amount * 60 : amount;
+                work = work.replace(match[0], ' ');
+            }
+            return { work, duration };
+        }
+
+        function extractRelative(work, reference) {
+            const match = work.match(/\b(?:peste|în|in)\s+(\d{1,3})\s*(minute|minut|min|ore|ora|oră|zile|zi|saptamani|săptămâni|saptamana|săptămâna|luni)\b/u);
+            if (!match) return null;
+            const amount = Number(match[1]);
+            const unit = match[2];
+            const next = new Date(reference);
+            if (/min/.test(unit)) next.setMinutes(next.getMinutes() + amount);
+            else if (/or/.test(unit)) next.setHours(next.getHours() + amount);
+            else if (/zi/.test(unit)) next.setDate(next.getDate() + amount);
+            else if (/sapt/.test(unit) || /săpt/.test(unit)) next.setDate(next.getDate() + amount * 7);
+            else if (/luni/.test(unit)) next.setMonth(next.getMonth() + amount);
+            return { work: work.replace(match[0], ' '), date: next };
+        }
+
+        function extractDate(work, reference) {
+            const explicit = [
+                { pattern: /\bazi\b|\bastăzi\b|\bastazi\b/u, offset: 0 },
+                { pattern: /\bmâine\b|\bmaine\b/u, offset: 1 },
+                { pattern: /\bpoimâine\b|\bpoimaine\b/u, offset: 2 }
+            ];
+
+            for (const item of explicit) {
+                const match = work.match(item.pattern);
+                if (match) {
+                    const next = new Date(reference);
+                    next.setDate(reference.getDate() + item.offset);
+                    return { work: work.replace(match[0], ' '), date: next };
+                }
+            }
+
+            let match = work.match(/\b(?:weekendul viitor|weekend viitor|weekndul viitor|weeknd viitor|week-endul viitor|week-end viitor)\b/u);
+            if (match) {
+                const next = nextWeekday(reference, 6, true);
+                next.setDate(next.getDate() + 7);
+                return { work: work.replace(match[0], ' '), date: next };
+            }
+
+            match = work.match(/\b(?:in weekend|în weekend|in weeknd|în weeknd|in week-end|în week-end|weekendul acesta|weekendul asta|weekend|weeknd|week-end)\b/u);
+            if (match) {
+                return { work: work.replace(match[0], ' '), date: nextWeekday(reference, 6, false) };
+            }
+
+            match = work.match(/\b(\d{1,2})[./-](\d{1,2})(?:[./-](\d{2,4}))?\b/u);
+            if (match) {
+                const day = Number(match[1]);
+                const month = Number(match[2]) - 1;
+                let year = match[3] ? Number(match[3]) : reference.getFullYear();
+                if (year < 100) year += 2000;
+                const next = new Date(reference);
+                next.setFullYear(year, month, day);
+                next.setHours(9, 0, 0, 0);
+                if (!match[3] && next < reference) next.setFullYear(year + 1);
+                return { work: work.replace(match[0], ' '), date: next };
+            }
+
+            match = work.match(/\bpe\s+(\d{1,2})\s+(ianuarie|februarie|martie|aprilie|mai|iunie|iulie|august|septembrie|octombrie|noiembrie|decembrie)(?:\s+(\d{4}))?\b/u);
+            if (match) {
+                const day = Number(match[1]);
+                const month = months[match[2]];
+                let year = match[3] ? Number(match[3]) : reference.getFullYear();
+                const next = new Date(reference);
+                next.setFullYear(year, month, day);
+                next.setHours(9, 0, 0, 0);
+                if (!match[3] && next < reference) next.setFullYear(year + 1);
+                return { work: work.replace(match[0], ' '), date: next };
+            }
+
+            match = work.match(/\b(luni|marti|marți|miercuri|joi|vineri|sambata|sâmbătă|duminica|duminică)(?:\s+(?:viitoare|viitor|urmatoare|următor))?\b/u);
+            if (match) {
+                const skip = /\b(viitoare|viitor|urmatoare|următor)\b/u.test(match[0]);
+                return { work: work.replace(match[0], ' '), date: nextWeekday(reference, weekdays[match[1]], skip) };
+            }
+
+            return null;
+        }
+
+        function extractTime(work) {
+            const patterns = [
+                /\b(?:la|ora)\s*(\d{1,2})[:.](\d{2})\b/u,
+                /\b(?:la ora|la)\s*(\d{1,2})\b/u,
+                /\b(\d{1,2})\s+si\s+jumatate\b/u,
+                /\b(\d{1,2})\s+și\s+jumătate\b/u,
+                /\b(\d{1,2})\s+si\s+un\s+sfert\b/u,
+                /\b(\d{1,2})\s+și\s+un\s+sfert\b/u
+            ];
+
+            for (const pattern of patterns) {
+                const match = work.match(pattern);
+                if (!match) continue;
+                let hour = Number(match[1]);
+                let minute = match[2] ? Number(match[2]) : 0;
+                if (match[0].includes('jum')) minute = 30;
+                if (match[0].includes('sfert')) minute = 15;
+                if (hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59) {
+                    return { work: work.replace(match[0], ' '), time: { hour, minute } };
+                }
+            }
+
+            const period = [
+                { pattern: /\bdimineața\b|\bdimineata\b/u, hour: 9, minute: 0 },
+                { pattern: /\bprânz\b|\bpranz\b/u, hour: 12, minute: 0 },
+                { pattern: /\bdupă-amiază\b|\bdupa-amiaza\b|\bdupă amiază\b|\bdupa amiaza\b/u, hour: 15, minute: 0 },
+                { pattern: /\bdiseară\b|\bdiseara\b|\bseara\b/u, hour: 19, minute: 0 }
+            ].find((item) => item.pattern.test(work));
+
+            if (period) {
+                return { work: work.replace(period.pattern, ' '), time: { hour: period.hour, minute: period.minute } };
+            }
+
+            return null;
+        }
+
+        function extractLocation(work) {
+            const match = work.match(/\b(?:la|în|in)\s+([a-z0-9ăâîșț\-.]+(?:\s+[a-z0-9ăâîșț\-.]+){0,3})\b/u);
+            if (!match) return null;
+            const blocked = ['azi', 'astăzi', 'astazi', 'maine', 'mâine', 'poimaine', 'poimâine', 'weekend', 'weeknd', 'week-end', 'ora', 'minute', 'ore'];
+            const value = match[1].split(/\s+/).filter((word) => !blocked.includes(word)).join(' ').trim();
+            if (!value || /^\d/.test(value)) return null;
+            return { work: work.replace(match[0], ' '), location: titleCase(value) };
+        }
+
+        function extractTitle(work) {
+            return work
+                .replace(/\b(?:trebuie|sa|să|iar|si|și|in|în|la|pe)\b/gu, ' ')
+                .replace(/\s+/g, ' ')
+                .trim()
+                .replace(/^[\-:,.;\s]+|[\-:,.;\s]+$/g, '');
+        }
+
+        function looksLikeTask(text, allDay) {
+            return allDay || /\b(trebuie|task|todo|to do|de facut|de făcut|de dus|de luat|de cumparat|de cumpărat)\b/u.test(text);
+        }
+
+        function parseRomanian(input) {
+            const reference = new Date();
+            let work = ` ${normalize(input)} `;
+            const durationResult = extractDuration(work);
+            work = durationResult.work;
+
+            let date = null;
+            let time = null;
+            let allDay = false;
+
+            const relative = extractRelative(work, reference);
+            if (relative) {
+                work = relative.work;
+                date = relative.date;
+                time = { hour: date.getHours(), minute: date.getMinutes() };
+            } else {
+                const dateResult = extractDate(work, reference);
+                if (dateResult) {
+                    work = dateResult.work;
+                    date = dateResult.date;
+                }
+
+                const timeResult = extractTime(work);
+                if (timeResult) {
+                    work = timeResult.work;
+                    time = timeResult.time;
+                }
+
+                if (!date && time) {
+                    date = setTime(new Date(reference), time.hour, time.minute);
+                    if (date < reference) date.setDate(date.getDate() + 1);
+                }
+            }
+
+            if (!date) {
+                date = new Date(reference);
+                allDay = true;
+            }
+
+            if (!time && !relative) {
+                allDay = true;
+            }
+
+            let location = null;
+            const locationResult = extractLocation(work);
+            if (locationResult) {
+                work = locationResult.work;
+                location = locationResult.location;
+            }
+
+            const title = extractTitle(work);
+            const type = looksLikeTask(normalize(input), allDay) ? 'task' : 'event';
+            const safeTitle = title ? titleCase(title) : (type === 'task' ? 'Task Nou' : 'Eveniment Nou');
+
+            let start = new Date(date);
+            let end;
+            if (allDay) {
+                start.setHours(9, 0, 0, 0);
+                end = new Date(start);
+                end.setDate(end.getDate() + 1);
+            } else {
+                start = setTime(date, time.hour, time.minute);
+                end = addMinutes(start, durationResult.duration);
+            }
+
+            return {
+                title: safeTitle,
+                type,
+                location,
+                allDay,
+                start,
+                end,
+                original: input.trim()
+            };
+        }
+
+        function stripTaskPrefix(summary) {
+            const prefix = state.settings.taskPrefix || defaultSettings.taskPrefix;
+            return summary.startsWith(prefix) ? summary.slice(prefix.length) : summary;
+        }
+
+        function mapApiEvent(apiEvent) {
+            const rawStart = apiEvent.start?.dateTime || apiEvent.start?.date;
+            const rawEnd = apiEvent.end?.dateTime || apiEvent.end?.date;
+            const allDay = Boolean(apiEvent.start?.date && !apiEvent.start?.dateTime);
+            const typeFromMetadata = apiEvent.extendedProperties?.private?.calendarAiType;
+            const prefixed = (apiEvent.summary || '').startsWith(state.settings.taskPrefix || defaultSettings.taskPrefix);
+            const type = typeFromMetadata || (prefixed ? 'task' : 'event');
+
+            return {
+                id: apiEvent.id,
+                title: stripTaskPrefix(apiEvent.summary || 'Fără titlu'),
+                type,
+                location: apiEvent.location || '',
+                allDay,
+                start: allDay ? `${apiEvent.start.date}T09:00:00` : apiEvent.start.dateTime,
+                end: allDay ? `${apiEvent.end.date}T09:00:00` : apiEvent.end.dateTime,
+                original: apiEvent.description || '',
+                synced: true
+            };
+        }
+
+        function buildPayload(item) {
+            const title = item.type === 'task'
+                ? `${state.settings.taskPrefix}${item.title}`
+                : item.title;
+
+            const payload = {
+                summary: title,
+                description: item.original ? `Text original: ${item.original}` : '',
+                location: item.location || '',
+                reminders: {
+                    useDefault: false,
+                    overrides: [{ method: 'popup', minutes: Math.max(1, Number(state.settings.notificationLeadMinutes || 10)) }]
+                },
+                extendedProperties: {
+                    private: {
+                        calendarAiType: item.type
+                    }
+                }
+            };
+
+            if (item.allDay) {
+                const start = new Date(item.start);
+                const end = new Date(item.end);
+                payload.start = { date: dateKey(start) };
+                payload.end = { date: dateKey(end) };
+            } else {
+                payload.start = { dateTime: new Date(item.start).toISOString(), timeZone: APP_CONFIG.TIMEZONE };
+                payload.end = { dateTime: new Date(item.end).toISOString(), timeZone: APP_CONFIG.TIMEZONE };
+            }
+
+            return payload;
+        }
+
+        function saveSession() {
+            localStorage.setItem(STORAGE_KEYS.session, JSON.stringify({
+                accessToken: state.accessToken,
+                expiresAt: state.expiresAt,
+                profile: state.profile,
+                wantsSession: state.wantsSession
+            }));
+        }
+
+        function loadSession() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEYS.session);
+                if (!raw) return;
+                const saved = JSON.parse(raw);
+                state.accessToken = saved.accessToken || '';
+                state.expiresAt = Number(saved.expiresAt || 0);
+                state.profile = saved.profile || null;
+                state.wantsSession = Boolean(saved.wantsSession);
+            } catch (_) {
+                localStorage.removeItem(STORAGE_KEYS.session);
+            }
+        }
+
+        function clearSession() {
+            state.accessToken = '';
+            state.expiresAt = 0;
+            state.profile = null;
+            state.wantsSession = false;
+            localStorage.removeItem(STORAGE_KEYS.session);
+        }
+
+        function saveSettings() {
+            localStorage.setItem(STORAGE_KEYS.settings, JSON.stringify(state.settings));
+        }
+
+        function loadSettings() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEYS.settings);
+                if (!raw) return;
+                state.settings = { ...defaultSettings, ...JSON.parse(raw) };
+            } catch (_) {
+                state.settings = { ...defaultSettings };
+                localStorage.removeItem(STORAGE_KEYS.settings);
+            }
+        }
+
+        function applySettingsToUi() {
+            displayNameSetting.value = state.settings.displayName;
+            animationsSetting.checked = state.settings.animations;
+            showMonthSetting.checked = state.settings.showMonthItems;
+            soundEnabledSetting.checked = state.settings.soundEnabled;
+            soundVolumeSetting.value = String(state.settings.soundVolume);
+            notificationsSetting.checked = state.settings.notificationsEnabled;
+            notificationLeadSetting.value = String(state.settings.notificationLeadMinutes);
+            defaultDurationSetting.value = String(state.settings.defaultDuration);
+            taskPrefixSetting.value = state.settings.taskPrefix;
+            document.body.classList.toggle('reduced-motion', !state.settings.animations);
+            updateProfileUi();
+        }
+
+        function updateProfileUi() {
+            const displayName = state.settings.displayName || state.profile?.name || 'Google user';
+            profileName.textContent = displayName;
+            profileEmail.textContent = state.profile?.email || '-';
+            profilePhoto.src = state.profile?.picture || '';
+            profilePhoto.classList.toggle('hidden', !state.profile?.picture);
+            sessionLabel.textContent = displayName;
+        }
+
+        function renderView() {
+            const loggedIn = Boolean(state.accessToken);
+            authView.style.display = loggedIn ? 'none' : 'flex';
+            appView.style.display = loggedIn ? 'block' : 'none';
+            updateProfileUi();
+        }
+
+        async function fetchJson(url, options = {}) {
+            const response = await fetch(url, options);
+            if (!response.ok) {
+                const text = await response.text();
+                throw new Error(text || `HTTP ${response.status}`);
+            }
+            if (response.status === 204) {
+                return {};
+            }
+            const text = await response.text();
+            return text ? JSON.parse(text) : {};
+        }
+
+        async function fetchProfile() {
+            state.profile = await fetchJson('https://www.googleapis.com/oauth2/v3/userinfo', {
+                headers: { Authorization: `Bearer ${state.accessToken}` }
+            });
+        }
+
+        async function fetchMonthItems() {
+            calendarGrid.classList.add('fade-out'); // Start transition
+            
+            const monthStart = startOfMonth(state.visibleMonth);
+            const monthEnd = endOfMonth(state.visibleMonth);
+            const monthKey = `${monthStart.getFullYear()}-${pad(monthStart.getMonth() + 1)}`;
+            state.loadedMonthKey = monthKey;
+
+            const params = new URLSearchParams({
+                singleEvents: 'true',
+                orderBy: 'startTime',
+                timeMin: monthStart.toISOString(),
+                timeMax: monthEnd.toISOString(),
+                maxResults: '250'
+            });
+
+            try {
+                const data = await fetchJson(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(APP_CONFIG.CALENDAR_ID)}/events?${params.toString()}`, {
+                    headers: { Authorization: `Bearer ${state.accessToken}` }
+                });
+
+                state.remoteItems = (data.items || []).map(mapApiEvent);
+            } catch (e) {
+                console.error('Fetch failed', e);
+            } finally {
+                renderCalendar();
+                renderList();
+                scheduleNotifications();
+                
+                // Slight delay to ensure DOM update is perceived before fading in
+                setTimeout(() => {
+                    calendarGrid.classList.remove('fade-out');
+                }, 50);
+            }
+        }
+
+        function getVisibleItems() {
+            if (state.settings.showMonthItems) {
+                return [...state.remoteItems].sort((a, b) => new Date(a.start) - new Date(b.start));
+            }
+
+            return state.remoteItems
+                .filter((item) => dateKey(item.start) === state.selectedDateKey)
+                .sort((a, b) => new Date(a.start) - new Date(b.start));
+        }
+
+        function renderList() {
+            const visibleItems = getVisibleItems();
+            const selectedDate = parseDateKey(state.selectedDateKey);
+            selectedDateLabel.textContent = formatLabel(selectedDate);
+            filterMeta.textContent = state.settings.showMonthItems ? 'Toată luna' : 'Data selectată';
+            listMeta.textContent = `${visibleItems.length} rezultate`;
+
+            if (!visibleItems.length) {
+                itemsBox.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📅</div><p>Nicio activitate pentru această zi</p></div>`;
+                return;
+            }
+
+            itemsBox.innerHTML = visibleItems.map((item, index) => `
+                <div class="item-row ${item.type}" style="animation-delay:${index * 45}ms">
+                    <div class="item-stripe"></div>
+                    <div class="item-content">
+                        <div class="item-title">${item.title}</div>
+                        <div class="item-meta-row">
+                            <span class="item-time">${formatItemDate(item.start, item.allDay)}${item.allDay ? ' · tot ziua' : ''}</span>
+                            ${item.location ? `<span class="item-loc">· ${item.location}</span>` : ''}
+                        </div>
+                    </div>
+                    <span class="item-type-badge">${item.type === 'task' ? 'Task' : 'Event'}</span>
+                    <div class="item-actions-row">
+                        <button class="icon-btn" type="button" data-action="edit" data-id="${item.id}" title="Editează">✎</button>
+                        <button class="icon-btn danger" type="button" data-action="delete" data-id="${item.id}" title="Șterge">✕</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderCalendar() {
+            calendarTitle.textContent = formatMonth(state.visibleMonth);
+            const monthStart = startOfMonth(state.visibleMonth);
+            const firstDay = monthStart.getDay() === 0 ? 7 : monthStart.getDay();
+            const gridStart = new Date(monthStart);
+            gridStart.setDate(monthStart.getDate() - (firstDay - 1));
+
+            const selected = state.selectedDateKey;
+            const todayKey = dateKey(new Date());
+            const monthIndex = state.visibleMonth.getMonth();
+            const cells = [];
+
+            for (let index = 0; index < 42; index += 1) {
+                const current = new Date(gridStart);
+                current.setDate(gridStart.getDate() + index);
+                const currentKey = dateKey(current);
+                const dayItems = state.remoteItems.filter((item) => dateKey(item.start) === currentKey);
+                const taskCount = dayItems.filter((item) => item.type === 'task').length;
+                const eventCount = dayItems.filter((item) => item.type === 'event').length;
+
+                cells.push(`
+                    <button class="cal-day ${current.getMonth() !== monthIndex ? 'muted' : ''} ${currentKey === selected ? 'selected' : ''} ${currentKey === todayKey ? 'today' : ''}" type="button" data-day="${currentKey}">
+                        ${current.getDate()}
+                        <span class="cal-dots">
+                            ${eventCount ? '<span class="dot event"></span>' : ''}
+                            ${taskCount ? '<span class="dot task"></span>' : ''}
+                        </span>
+                    </button>
+                `);
+            }
+
+            calendarGrid.innerHTML = cells.join('');
+        }
+
+        function openEditModal(itemId) {
+            const item = state.remoteItems.find((entry) => entry.id === itemId);
+            if (!item) return;
+
+            state.editingItemId = itemId;
+            editTitle.value = item.title;
+            editType.value = item.type;
+            editLocation.value = item.location || '';
+            editAllDay.checked = item.allDay;
+            editDate.value = dateKey(item.start);
+            editTime.value = item.allDay ? '09:00' : `${pad(new Date(item.start).getHours())}:${pad(new Date(item.start).getMinutes())}`;
+            setStatus(editStatus, '', '');
+            editModal.classList.add('open');
+        }
+
+        function closeEditModal() {
+            editModal.classList.remove('open');
+            state.editingItemId = null;
+            setStatus(editStatus, '', '');
+        }
+
+        function playSound(frequency = 740, duration = 0.08) {
+            if (!state.settings.soundEnabled) return;
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContextClass) return;
+            const context = new AudioContextClass();
+            const oscillator = context.createOscillator();
+            const gain = context.createGain();
+            oscillator.type = 'sine';
+            oscillator.frequency.value = frequency;
+            gain.gain.value = Math.max(0, Math.min(1, Number(state.settings.soundVolume || 0.18)));
+            oscillator.connect(gain);
+            gain.connect(context.destination);
+            oscillator.start();
+            oscillator.stop(context.currentTime + duration);
+            oscillator.onended = () => context.close();
+        }
+
+        function clearNotificationTimers() {
+            state.notificationTimers.forEach((timer) => clearTimeout(timer));
+            state.notificationTimers = [];
+        }
+
+        function scheduleNotifications() {
+            clearNotificationTimers();
+
+            if (!('Notification' in window) || !state.settings.notificationsEnabled || Notification.permission !== 'granted') {
+                return;
+            }
+
+            const leadMs = Number(state.settings.notificationLeadMinutes || 10) * 60 * 1000;
+            const now = Date.now();
+
+            state.remoteItems.forEach((item) => {
+                const target = new Date(item.start).getTime() - leadMs;
+                if (target <= now || target - now > 24 * 60 * 60 * 1000) {
+                    return;
+                }
+
+                const timer = setTimeout(() => {
+                    new Notification(item.title, {
+                        body: `${item.type === 'task' ? 'Task' : 'Eveniment'} • ${formatItemDate(item.start, item.allDay)}`
+                    });
+                    playSound(item.type === 'task' ? 620 : 820, 0.12);
+                }, target - now);
+
+                state.notificationTimers.push(timer);
+            });
+        }
+
+        async function createItemFromInput() {
+            const text = phraseInput.value.trim();
+            if (!text) {
+                setStatus(appStatus, 'Input gol.', 'error');
+                return;
+            }
+
+            const parsed = parseRomanian(text);
+            const payload = buildPayload({
+                ...parsed,
+                start: parsed.start.toISOString(),
+                end: parsed.end.toISOString()
+            });
+
+            try {
+                await fetchJson(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(APP_CONFIG.CALENDAR_ID)}/events`, {
+                    method: 'POST',
+                    headers: {
+                        Authorization: `Bearer ${state.accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                phraseInput.value = '';
+                setStatus(appStatus, 'Adăugat.', 'success');
+                playSound(parsed.type === 'task' ? 620 : 820);
+                await fetchMonthItems();
+                phraseInput.focus();
+            } catch (error) {
+                setStatus(appStatus, `Nu am putut adăuga: ${error.message}`, 'error');
+            }
+        }
+
+        async function saveEditedItem() {
+            const item = state.remoteItems.find((entry) => entry.id === state.editingItemId);
+            if (!item) return;
+
+            const allDay = editAllDay.checked;
+            const dateValue = editDate.value || state.selectedDateKey;
+            const timeValue = editTime.value || '09:00';
+            const [year, month, day] = dateValue.split('-').map(Number);
+            const [hour, minute] = timeValue.split(':').map(Number);
+            const startDate = new Date(year, month - 1, day, hour || 9, minute || 0, 0);
+            const endDate = allDay
+                ? new Date(year, month - 1, day + 1, 9, 0, 0)
+                : addMinutes(startDate, Number(state.settings.defaultDuration || 60));
+
+            const updatedItem = {
+                ...item,
+                title: editTitle.value.trim() || item.title,
+                type: editType.value,
+                location: editLocation.value.trim(),
+                allDay,
+                start: startDate.toISOString(),
+                end: endDate.toISOString()
+            };
+
+            try {
+                await fetchJson(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(APP_CONFIG.CALENDAR_ID)}/events/${encodeURIComponent(item.id)}`, {
+                    method: 'PATCH',
+                    headers: {
+                        Authorization: `Bearer ${state.accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(buildPayload(updatedItem))
+                });
+
+                playSound(760);
+                closeEditModal();
+                await fetchMonthItems();
+            } catch (error) {
+                setStatus(editStatus, `Nu am putut salva: ${error.message}`, 'error');
+            }
+        }
+
+        async function deleteEditedItem() {
+            const item = state.remoteItems.find((entry) => entry.id === state.editingItemId);
+            if (!item) return;
+
+            try {
+                await fetchJson(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(APP_CONFIG.CALENDAR_ID)}/events/${encodeURIComponent(item.id)}`, {
+                    method: 'DELETE',
+                    headers: { Authorization: `Bearer ${state.accessToken}` }
+                });
+            } catch (error) {
+                if (!/HTTP 204/i.test(error.message)) {
+                    setStatus(editStatus, `Nu am putut șterge: ${error.message}`, 'error');
+                    return;
+                }
+            }
+
+            playSound(480, 0.12);
+            closeEditModal();
+            await fetchMonthItems();
+        }
+
+        function bindSettings() {
+            displayNameSetting.addEventListener('input', () => {
+                state.settings.displayName = displayNameSetting.value.trim();
+                saveSettings();
+                updateProfileUi();
+            });
+
+            animationsSetting.addEventListener('change', () => {
+                state.settings.animations = animationsSetting.checked;
+                saveSettings();
+                applySettingsToUi();
+            });
+
+            showMonthSetting.addEventListener('change', () => {
+                state.settings.showMonthItems = showMonthSetting.checked;
+                saveSettings();
+                renderList();
+            });
+
+            soundEnabledSetting.addEventListener('change', () => {
+                state.settings.soundEnabled = soundEnabledSetting.checked;
+                saveSettings();
+            });
+
+            soundVolumeSetting.addEventListener('change', () => {
+                state.settings.soundVolume = Math.max(0, Math.min(1, Number(soundVolumeSetting.value || 0.18)));
+                soundVolumeSetting.value = String(state.settings.soundVolume);
+                saveSettings();
+            });
+
+            notificationsSetting.addEventListener('change', async () => {
+                state.settings.notificationsEnabled = notificationsSetting.checked;
+                saveSettings();
+                if (state.settings.notificationsEnabled && Notification.permission !== 'granted') {
+                    await requestNotificationPermission();
+                }
+                scheduleNotifications();
+            });
+
+            notificationLeadSetting.addEventListener('change', () => {
+                state.settings.notificationLeadMinutes = Math.max(1, Number(notificationLeadSetting.value || 10));
+                notificationLeadSetting.value = String(state.settings.notificationLeadMinutes);
+                saveSettings();
+                scheduleNotifications();
+            });
+
+            defaultDurationSetting.addEventListener('change', () => {
+                state.settings.defaultDuration = Math.max(15, Number(defaultDurationSetting.value || 60));
+                defaultDurationSetting.value = String(state.settings.defaultDuration);
+                saveSettings();
+            });
+
+            taskPrefixSetting.addEventListener('change', () => {
+                state.settings.taskPrefix = taskPrefixSetting.value || defaultSettings.taskPrefix;
+                saveSettings();
+                renderList();
+                renderCalendar();
+            });
+
+            testSoundButton.addEventListener('click', () => playSound(740));
+            todayButton.addEventListener('click', async () => {
+                state.visibleMonth = startOfMonth(new Date());
+                state.selectedDateKey = dateKey(new Date());
+                await fetchMonthItems();
+            });
+        }
+
+        async function requestNotificationPermission() {
+            if (!('Notification' in window)) {
+                setStatus(appStatus, 'Browserul nu suportă notificări.', 'error');
+                return;
+            }
+            const result = await Notification.requestPermission();
+            if (result === 'granted') {
+                setStatus(appStatus, 'Notificările web sunt active.', 'success');
+                scheduleNotifications();
+            } else {
+                setStatus(appStatus, 'Notificările nu au fost permise.', 'error');
+            }
+        }
+
+        function initGoogle() {
+            if (state.tokenClient || typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
+                return;
+            }
+
+            state.tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: APP_CONFIG.GOOGLE_CLIENT_ID,
+                scope: 'openid email profile https://www.googleapis.com/auth/calendar',
+                callback: async (response) => {
+                    if (!response.access_token) {
+                        setStatus(authStatus, 'Logare eșuată.', 'error');
+                        return;
+                    }
+
+                    state.accessToken = response.access_token;
+                    state.expiresAt = Date.now() + Number(response.expires_in || 3600) * 1000;
+                    state.wantsSession = true;
+
+                    try {
+                        await fetchProfile();
+                        saveSession();
+                        renderView();
+                        applySettingsToUi();
+                        await fetchMonthItems();
+                        phraseInput.focus();
+                    } catch (error) {
+                        setStatus(authStatus, `Google error: ${error.message}`, 'error');
+                    }
+                },
+                error_callback: () => {
+                    setStatus(authStatus, 'Google a blocat autentificarea.', 'error');
+                }
+            });
+        }
+
+        function maybeRestoreSession() {
+            if (state.accessToken && state.expiresAt > Date.now()) {
+                renderView();
+                applySettingsToUi();
+                fetchMonthItems().catch((error) => setStatus(appStatus, error.message, 'error'));
+                return;
+            }
+
+            if (!state.wantsSession) {
+                clearSession();
+                renderView();
+                return;
+            }
+
+            initGoogle();
+            if (state.tokenClient) {
+                state.tokenClient.requestAccessToken({ prompt: '' });
+            }
+        }
+
+        loginButton.addEventListener('click', () => {
+            initGoogle();
+            if (state.tokenClient) {
+                state.tokenClient.requestAccessToken({ prompt: 'consent' });
+            }
+        });
+
+        logoutButton.addEventListener('click', () => {
+            clearNotificationTimers();
+            clearSession();
+            state.remoteItems = [];
+            renderView();
+            renderList();
+            renderCalendar();
+            setStatus(authStatus, '', '');
+            setStatus(appStatus, '', '');
+        });
+
+        settingsToggle.addEventListener('click', () => {
+            settingsModal.classList.add('open');
+        });
+
+        closeSettingsButton.addEventListener('click', () => {
+            settingsModal.classList.remove('open');
+        });
+
+        settingsModal.addEventListener('click', (event) => {
+            if (event.target === settingsModal) {
+                settingsModal.classList.remove('open');
+            }
+        });
+
+        submitButton.addEventListener('click', createItemFromInput);
+
+        phraseInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                createItemFromInput();
+            }
+        });
+
+        prevMonthButton.addEventListener('click', async () => {
+            state.visibleMonth = shiftMonth(state.visibleMonth, -1);
+            state.selectedDateKey = dateKey(state.visibleMonth);
+            await fetchMonthItems();
+        });
+
+        nextMonthButton.addEventListener('click', async () => {
+            state.visibleMonth = shiftMonth(state.visibleMonth, 1);
+            state.selectedDateKey = dateKey(state.visibleMonth);
+            await fetchMonthItems();
+        });
+
+        calendarGrid.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-day]');
+            if (!button) return;
+            state.selectedDateKey = button.getAttribute('data-day');
+            renderCalendar();
+            renderList();
+        });
+
+        itemsBox.addEventListener('click', async (event) => {
+            const button = event.target.closest('[data-action]');
+            if (!button) return;
+            const itemId = button.getAttribute('data-id');
+            const action = button.getAttribute('data-action');
+
+            if (action === 'edit') {
+                openEditModal(itemId);
+            }
+
+            if (action === 'delete') {
+                openEditModal(itemId);
+            }
+        });
+
+        closeEditButton.addEventListener('click', closeEditModal);
+        saveEditButton.addEventListener('click', saveEditedItem);
+        deleteEditButton.addEventListener('click', deleteEditedItem);
+        editModal.addEventListener('click', (event) => {
+            if (event.target === editModal) {
+                closeEditModal();
+            }
+        });
+
+        notificationPermissionButton.addEventListener('click', requestNotificationPermission);
+
+        loadSession();
+        loadSettings();
+        applySettingsToUi();
+        bindSettings();
+        renderView();
+        renderCalendar();
+        renderList();
+
+        window.addEventListener('load', () => {
+            initGoogle();
+            maybeRestoreSession();
+        });
+
+</script>
+
+<script type="text/javascript" src="/unprotected/back_to_spaceship.js?hash=4975d460e508829e8fb64d3962bc44ad35f3a95a"></script>
+
+</body>
+</html>
