@@ -1,7 +1,0 @@
-DirectoryIndex index.html
-Options -Indexes
-
-<IfModule mod_rewrite.c>
-    RewriteEngine On
-    RewriteRule ^$ index.html [L]
-</IfModule>

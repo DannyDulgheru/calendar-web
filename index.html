@@ -1,806 +1,723 @@
 <!DOCTYPE html>
-<html lang="ro">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Calendar AI</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Calendar</title>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
+        /* ═══════════════════════════════════════════════════════
+           DESIGN TOKENS
+        ══════════════════════════════════════════════════════════ */
         :root {
-            --bg: #09090b;
-            --sidebar: #0a0a0d;
-            --surface: #111116;
-            --surface2: #18181e;
-            --border: #27272e;
-            --border-soft: #1c1c22;
-            --text: #f4f4f5;
-            --muted: #71717a;
-            --muted2: #52525b;
-            --event: #38bdf8;
-            --task: #34d399;
-            --danger: #f87171;
+            --sb-bg: #0d0d11;
+            --sb-surface: #131318;
+            --sb-border: #1e1e28;
+            --sb-text: #e4e4f0;
+            --sb-muted: #6b6b80;
+            --sb-muted2: #3f3f52;
+            --sb-width: 248px;
+
+            --main-bg-start: #ecf5e2;
+            --main-bg-end: #d8eaf8;
+            --main-text: #1a1a2e;
+            --main-muted: #6b7280;
+            --main-border: rgba(0,0,0,0.08);
+            --col-today: rgba(255,255,255,0.88);
+            --col-other: rgba(255,255,255,0.32);
+
             --accent: #818cf8;
+            --accent-dark: #6366f1;
+            --task-color: #34d399;
+            --danger: #f87171;
+
+            --hour-h: 60px;
+            --view-start: 7;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
-            background: var(--bg);
-            color: var(--text);
+            background: var(--sb-bg);
+            color: var(--sb-text);
             min-height: 100vh;
             font-size: 14px;
+            -webkit-font-smoothing: antialiased;
         }
 
-        /* ─── AUTH ─────────────────────────────── */
+        /* ═══ AUTH ═══════════════════════════════════════════ */
         #authView {
             display: flex;
             align-items: center;
             justify-content: center;
             min-height: 100vh;
+            background: linear-gradient(140deg, var(--main-bg-start) 0%, var(--main-bg-end) 100%);
             padding: 24px;
         }
 
         .login-card {
-            width: min(340px, 100%);
+            width: min(360px, 100%);
+            background: rgba(255,255,255,0.92);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 40px 32px;
             text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
             animation: fadeUp 0.4s ease;
         }
 
         .login-icon {
-            width: 52px;
-            height: 52px;
+            width: 56px; height: 56px;
             margin: 0 auto 20px;
             background: var(--accent);
-            border-radius: 14px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 22px;
+            border-radius: 16px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 24px;
         }
 
         .login-card h1 {
-            font-size: 1.6rem;
-            font-weight: 700;
-            letter-spacing: -0.03em;
-            margin-bottom: 6px;
+            font-size: 1.6rem; font-weight: 700; letter-spacing: -0.03em;
+            color: var(--main-text); margin-bottom: 8px;
         }
 
         .login-card p {
-            color: var(--muted);
-            font-size: 0.85rem;
-            margin-bottom: 24px;
-            line-height: 1.5;
+            color: var(--main-muted); font-size: 0.88rem;
+            margin-bottom: 28px; line-height: 1.6;
         }
 
         .btn-login {
-            width: 100%;
-            padding: 11px 18px;
-            background: var(--accent);
-            color: #fff;
-            border: none;
-            border-radius: 8px;
-            font: inherit;
-            font-size: 0.9rem;
-            font-weight: 600;
-            cursor: pointer;
+            width: 100%; padding: 12px 20px;
+            background: var(--accent); color: #fff; border: none;
+            border-radius: 10px; font: inherit; font-size: 0.92rem;
+            font-weight: 600; cursor: pointer;
             transition: opacity 0.15s, transform 0.1s;
         }
-
-        .btn-login:hover { opacity: 0.9; }
+        .btn-login:hover { opacity: 0.88; }
         .btn-login:active { transform: scale(0.98); }
 
-        /* ─── APP SHELL ─────────────────────────── */
-        #appView {
-            display: none;
-            height: 100vh;
+        .auth-status {
+            margin-top: 12px; font-size: 0.82rem;
+            color: #ef4444; min-height: 20px; text-align: center;
         }
 
-        .shell {
-            display: flex;
-            height: 100vh;
-        }
+        /* ═══ APP SHELL ════════════════════════════════════════ */
+        #appView { display: none; height: 100vh; overflow: hidden; }
 
-        /* ─── SIDEBAR ───────────────────────────── */
+        .shell { display: flex; height: 100vh; }
+
+        /* ═══ SIDEBAR ════════════════════════════════════════ */
         .sidebar {
-            width: 248px;
-            flex-shrink: 0;
-            background: var(--sidebar);
-            border-right: 1px solid var(--border-soft);
-            display: flex;
-            flex-direction: column;
-            overflow-y: auto;
-            animation: slideIn 0.3s ease;
+            width: var(--sb-width); flex-shrink: 0;
+            background: var(--sb-bg); border-right: 1px solid var(--sb-border);
+            display: flex; flex-direction: column;
+            overflow-y: auto; overflow-x: hidden;
+            transition: transform 0.3s cubic-bezier(0.16,1,0.3,1);
+            z-index: 50;
         }
 
         .sidebar-profile {
-            padding: 16px;
-            border-bottom: 1px solid var(--border-soft);
-            display: flex;
-            align-items: center;
-            gap: 10px;
+            padding: 14px 14px 12px;
+            border-bottom: 1px solid var(--sb-border);
+            display: flex; align-items: center; gap: 10px;
         }
 
         .avatar-wrap {
-            position: relative;
-            width: 34px;
-            height: 34px;
-            flex-shrink: 0;
+            position: relative; width: 36px; height: 36px; flex-shrink: 0;
         }
-
         .avatar-bg {
-            position: absolute;
-            inset: 0;
-            border-radius: 10px;
-            background: linear-gradient(135deg, var(--accent) 0%, var(--event) 100%);
+            position: absolute; inset: 0; border-radius: 10px;
+            background: linear-gradient(135deg, var(--accent), #38bdf8);
         }
-
         .avatar-img {
-            position: absolute;
-            inset: 0;
-            width: 34px;
-            height: 34px;
-            border-radius: 10px;
-            object-fit: cover;
+            position: absolute; inset: 0; width: 36px; height: 36px;
+            border-radius: 10px; object-fit: cover;
         }
 
-        .profile-info { min-width: 0; }
-
+        .profile-info { min-width: 0; flex: 1; }
         .profile-name {
-            font-size: 0.82rem;
-            font-weight: 600;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            font-size: 0.82rem; font-weight: 600; color: var(--sb-text);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
-
         .profile-email-sidebar {
-            font-size: 0.7rem;
-            color: var(--muted);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            font-size: 0.68rem; color: var(--sb-muted);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
 
-        .sidebar-section {
-            padding: 14px 14px 10px;
+        /* Weather */
+        .weather-widget {
+            margin: 10px 14px;
+            padding: 12px 14px;
+            background: var(--sb-surface);
+            border: 1px solid var(--sb-border);
+            border-radius: 12px;
+            display: flex; align-items: center; gap: 10px;
+            min-height: 52px;
+            cursor: default;
         }
-
-        .sidebar-section-label {
-            font-size: 0.62rem;
-            font-weight: 700;
-            letter-spacing: 0.09em;
-            text-transform: uppercase;
-            color: var(--muted2);
-            margin-bottom: 10px;
+        .weather-icon { font-size: 1.7rem; flex-shrink: 0; }
+        .weather-info { flex: 1; min-width: 0; }
+        .weather-temp {
+            font-size: 1.1rem; font-weight: 700;
+            color: var(--sb-text); line-height: 1;
         }
+        .weather-desc {
+            font-size: 0.67rem; color: var(--sb-muted); margin-top: 2px;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .weather-loading { font-size: 0.75rem; color: var(--sb-muted); }
 
-        /* ─── MINI CALENDAR ─────────────────────── */
+        /* Sidebar sections */
+        .sb-section {
+            padding: 10px 14px 12px;
+            border-bottom: 1px solid var(--sb-border);
+        }
+        .sb-section-head {
+            display: flex; align-items: center; justify-content: space-between;
+            font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em;
+            color: var(--sb-text); margin-bottom: 10px;
+            cursor: pointer; user-select: none;
+        }
+        .sb-section-head .chev {
+            font-size: 0.7rem; color: var(--sb-muted);
+            transition: transform 0.2s; display: inline-block;
+        }
+        .sb-section-body { }
+        .sb-section-body.collapsed { display: none; }
+
+        /* Mini calendar */
         .cal-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 10px;
+            display: flex; align-items: center;
+            justify-content: space-between; margin-bottom: 8px;
         }
-
         .cal-title {
-            font-size: 0.8rem;
-            font-weight: 600;
-            text-transform: capitalize;
-            color: var(--text);
+            font-size: 0.78rem; font-weight: 600;
+            color: var(--sb-text); text-transform: capitalize;
         }
-
-        .cal-nav-btns {
-            display: flex;
-            gap: 3px;
-        }
-
+        .cal-nav-btns { display: flex; gap: 2px; }
         .cal-nav-btn {
-            width: 22px;
-            height: 22px;
-            border-radius: 5px;
-            border: 1px solid var(--border);
-            background: transparent;
-            color: var(--muted);
-            font-size: 0.85rem;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.12s;
-            padding: 0;
-            font: inherit;
+            width: 22px; height: 22px; border-radius: 6px;
+            border: 1px solid var(--sb-border); background: transparent;
+            color: var(--sb-muted); font-size: 0.9rem; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.12s; padding: 0; font: inherit;
         }
-
-        .cal-nav-btn:hover {
-            background: var(--surface2);
-            color: var(--text);
-        }
+        .cal-nav-btn:hover { background: var(--sb-surface); color: var(--sb-text); }
 
         .cal-weekdays {
-            display: grid;
-            grid-template-columns: repeat(7, 1fr);
-            margin-bottom: 3px;
+            display: grid; grid-template-columns: repeat(7, 1fr);
+            margin-bottom: 2px;
         }
-
         .cal-wd {
-            text-align: center;
-            font-size: 0.6rem;
-            font-weight: 700;
-            color: var(--muted2);
-            padding: 3px 0;
+            text-align: center; font-size: 0.58rem; font-weight: 700;
+            color: var(--sb-muted2); padding: 2px 0; letter-spacing: 0.05em;
         }
-
         .cal-grid {
-            display: grid;
-            grid-template-columns: repeat(7, 1fr);
-            gap: 2px;
-            transition: opacity 0.18s ease;
+            display: grid; grid-template-columns: repeat(7, 1fr);
+            gap: 1px; transition: opacity 0.18s;
         }
-
         .cal-grid.fade-out { opacity: 0; }
 
         .cal-day {
-            aspect-ratio: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            border-radius: 5px;
-            font-size: 0.7rem;
-            font-weight: 500;
-            cursor: pointer;
-            border: 1px solid transparent;
-            transition: background 0.1s;
-            background: transparent;
-            color: var(--text);
-            gap: 1px;
-            padding: 0;
-            font: inherit;
-            font-size: 0.7rem;
+            aspect-ratio: 1; display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            border-radius: 6px; font-size: 0.68rem; font-weight: 500;
+            cursor: pointer; border: 1px solid transparent;
+            transition: background 0.1s; background: transparent;
+            color: var(--sb-text); gap: 1px; padding: 0;
+            font: inherit; font-size: 0.68rem;
         }
-
-        .cal-day:hover { background: var(--surface2); }
-        .cal-day.muted { color: var(--muted2); opacity: 0.4; }
+        .cal-day:hover { background: var(--sb-surface); }
+        .cal-day.muted { color: var(--sb-muted2); opacity: 0.45; }
         .cal-day.today { color: var(--accent); font-weight: 700; }
         .cal-day.selected { background: var(--accent); color: #fff; }
         .cal-day.selected.today { color: #fff; }
 
-        .cal-dots {
-            display: flex;
-            gap: 2px;
-            height: 5px;
-            align-items: center;
+        .cal-dots { display: flex; gap: 2px; height: 4px; align-items: center; }
+        .dot { width: 3px; height: 3px; border-radius: 50%; }
+        .dot.event { background: #38bdf8; }
+        .dot.task { background: var(--task-color); }
+
+        /* Sidebar filter items */
+        .sb-check-item {
+            display: flex; align-items: center; gap: 8px;
+            padding: 5px 0; font-size: 0.78rem; color: var(--sb-text);
+            cursor: pointer;
+        }
+        .sb-check-item input[type="checkbox"] {
+            width: 14px; height: 14px; accent-color: var(--accent);
+            cursor: pointer; flex-shrink: 0;
         }
 
-        .dot {
-            width: 4px;
-            height: 4px;
-            border-radius: 50%;
-            flex-shrink: 0;
+        /* Category items */
+        .sb-cat-item {
+            display: flex; align-items: center; gap: 8px;
+            padding: 5px 0; font-size: 0.78rem; color: var(--sb-text);
+            cursor: pointer;
+        }
+        .cat-dot {
+            width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
         }
 
-        .dot.event { background: var(--event); }
-        .dot.task { background: var(--task); }
-
-        .legend-row {
-            display: flex;
-            gap: 12px;
-            padding-top: 10px;
-        }
-
-        .legend-item {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            font-size: 0.72rem;
-            color: var(--muted);
-        }
-
-        .dot-lg {
-            width: 7px;
-            height: 7px;
-            border-radius: 50%;
-        }
-
+        /* Sidebar footer */
         .sidebar-footer {
-            margin-top: auto;
-            padding: 10px;
-            border-top: 1px solid var(--border-soft);
-            display: flex;
-            gap: 4px;
+            margin-top: auto; padding: 10px 14px;
+            border-top: 1px solid var(--sb-border);
+            display: flex; gap: 4px;
+        }
+        .btn-sb {
+            flex: 1; padding: 7px 6px; background: transparent;
+            color: var(--sb-muted); border: 1px solid transparent;
+            border-radius: 8px; font: inherit; font-size: 0.76rem;
+            font-weight: 500; cursor: pointer; transition: all 0.12s;
+        }
+        .btn-sb:hover {
+            background: var(--sb-surface); color: var(--sb-text);
+            border-color: var(--sb-border);
         }
 
-        .btn-sidebar {
-            flex: 1;
-            padding: 8px 6px;
-            background: transparent;
-            color: var(--muted);
-            border: 1px solid transparent;
-            border-radius: 7px;
-            font: inherit;
-            font-size: 0.78rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.12s;
-            text-align: center;
-        }
-
-        .btn-sidebar:hover {
-            background: var(--surface2);
-            color: var(--text);
-            border-color: var(--border);
-        }
-
-        /* ─── MAIN ──────────────────────────────── */
+        /* ═══ MAIN AREA ════════════════════════════════════════ */
         .main {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
+            flex: 1; min-width: 0; display: flex; flex-direction: column;
+            background: linear-gradient(140deg, var(--main-bg-start) 0%, #ddf2ea 40%, var(--main-bg-end) 100%);
             overflow: hidden;
-            min-width: 0;
-            animation: fadeIn 0.25s ease;
         }
 
+        /* Topbar */
         .main-topbar {
-            padding: 0 20px;
-            height: 48px;
-            border-bottom: 1px solid var(--border-soft);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
+            padding: 0 18px; height: 54px;
+            background: rgba(255,255,255,0.5); backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--main-border);
+            display: flex; align-items: center;
+            justify-content: space-between; flex-shrink: 0; gap: 10px; z-index: 10;
+        }
+
+        .topbar-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
+        .topbar-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+        .menu-toggle {
+            display: none; width: 34px; height: 34px; align-items: center;
+            justify-content: center; border: none; background: transparent;
+            color: var(--main-text); font-size: 1.15rem; cursor: pointer;
+            border-radius: 8px; transition: background 0.12s; flex-shrink: 0;
+        }
+        .menu-toggle:hover { background: rgba(0,0,0,0.07); }
+
+        .main-title {
+            font-size: 1.1rem; font-weight: 700; color: var(--main-text);
+            letter-spacing: -0.02em; white-space: nowrap; overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .btn-today {
+            padding: 5px 13px; background: var(--main-text); color: #fff;
+            border: none; border-radius: 20px; font: inherit;
+            font-size: 0.78rem; font-weight: 600; cursor: pointer;
+            transition: opacity 0.12s; flex-shrink: 0;
+        }
+        .btn-today:hover { opacity: 0.78; }
+
+        .nav-btns { display: flex; gap: 2px; }
+        .nav-btn {
+            width: 28px; height: 28px; border-radius: 8px;
+            border: 1px solid var(--main-border);
+            background: rgba(255,255,255,0.6); color: var(--main-text);
+            font-size: 1rem; cursor: pointer; display: flex;
+            align-items: center; justify-content: center;
+            transition: background 0.12s; padding: 0; font: inherit;
+        }
+        .nav-btn:hover { background: rgba(255,255,255,0.92); }
+
+        .view-toggle {
+            display: flex; background: rgba(255,255,255,0.5);
+            border: 1px solid var(--main-border); border-radius: 10px; padding: 2px;
+        }
+        .view-btn {
+            padding: 4px 11px; border: none; background: transparent;
+            border-radius: 8px; font: inherit; font-size: 0.78rem;
+            font-weight: 500; color: var(--main-muted); cursor: pointer;
+            transition: all 0.15s;
+        }
+        .view-btn.active {
+            background: #fff; color: var(--main-text); font-weight: 600;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+        }
+
+        .btn-add-ev {
+            padding: 6px 14px; background: var(--main-text); color: #fff;
+            border: none; border-radius: 10px; font: inherit;
+            font-size: 0.82rem; font-weight: 600; cursor: pointer;
+            transition: opacity 0.12s; white-space: nowrap;
+        }
+        .btn-add-ev:hover { opacity: 0.78; }
+
+        /* Status bar */
+        .status-bar { display: none; padding: 7px 18px; font-size: 0.8rem; flex-shrink: 0; }
+        .status-bar.success {
+            display: block; color: #065f46;
+            background: rgba(167,243,208,0.3); border-bottom: 1px solid rgba(52,211,153,0.25);
+        }
+        .status-bar.error {
+            display: block; color: #991b1b;
+            background: rgba(254,202,202,0.3); border-bottom: 1px solid rgba(248,113,113,0.25);
+        }
+
+        /* Quick-add bar */
+        .quick-add-bar {
+            padding: 10px 18px;
+            background: rgba(255,255,255,0.38);
+            border-bottom: 1px solid var(--main-border);
             flex-shrink: 0;
-            gap: 12px;
+        }
+        .quick-add-inner { display: flex; gap: 8px; }
+        .quick-add-input {
+            flex: 1; padding: 9px 14px;
+            background: rgba(255,255,255,0.82);
+            border: 1.5px solid rgba(0,0,0,0.1);
+            border-radius: 10px; color: var(--main-text);
+            font: inherit; font-size: 0.86rem; outline: none;
+            transition: border-color 0.15s, background 0.15s;
+        }
+        .quick-add-input::placeholder { color: #9ca3af; }
+        .quick-add-input:focus { border-color: var(--accent); background: #fff; }
+        .btn-quick-add {
+            padding: 9px 18px; background: var(--accent); color: #fff;
+            border: none; border-radius: 10px; font: inherit;
+            font-size: 0.86rem; font-weight: 600; cursor: pointer;
+            white-space: nowrap; transition: opacity 0.15s;
+        }
+        .btn-quick-add:hover { opacity: 0.88; }
+
+        /* ═══ CALENDAR CONTAINER ══════════════════════════════ */
+        .cal-container {
+            flex: 1; overflow: hidden; display: flex; flex-direction: column;
         }
 
-        .main-date-label {
-            font-size: 0.88rem;
-            font-weight: 600;
-            letter-spacing: -0.01em;
+        /* ═══ WEEK VIEW ════════════════════════════════════════ */
+        .week-view { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+
+        .week-head-wrap {
+            display: flex; border-bottom: 1px solid var(--main-border);
+            background: rgba(255,255,255,0.3); flex-shrink: 0;
+        }
+        .week-tz-gap {
+            width: 54px; flex-shrink: 0; border-right: 1px solid var(--main-border);
+            display: flex; align-items: flex-end; justify-content: center;
+            padding-bottom: 8px;
+            font-size: 0.58rem; font-weight: 600; color: var(--main-muted);
+            letter-spacing: 0.03em;
+        }
+        .week-days-head {
+            display: grid; grid-template-columns: repeat(7,1fr); flex: 1;
+        }
+        .wdh {
+            padding: 10px 6px 10px; text-align: center; cursor: pointer;
+            transition: background 0.12s;
+            border-right: 1px solid var(--main-border);
+        }
+        .wdh:last-child { border-right: none; }
+        .wdh:hover { background: rgba(255,255,255,0.45); }
+        .wdh.today-col { background: rgba(255,255,255,0.72); }
+        .wdh-name {
+            font-size: 0.62rem; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.06em; color: var(--main-muted); margin-bottom: 4px;
+        }
+        .wdh-num {
+            font-size: 1.5rem; font-weight: 700;
+            line-height: 1; color: var(--main-text);
+        }
+        .wdh.today-col .wdh-num {
+            background: var(--accent); color: #fff;
+            width: 38px; height: 38px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto; font-size: 1.15rem;
+        }
+        .wdh.today-col .wdh-name { color: var(--accent-dark); }
+
+        .week-body-wrap { flex: 1; overflow-y: auto; overflow-x: hidden; position: relative; }
+        .week-body { display: flex; position: relative; min-height: calc((23 - 7) * var(--hour-h)); }
+
+        .week-time-col {
+            width: 54px; flex-shrink: 0;
+            border-right: 1px solid var(--main-border); position: relative;
+        }
+        .time-label {
+            position: absolute; right: 7px;
+            font-size: 0.62rem; font-weight: 500;
+            color: var(--main-muted); transform: translateY(-50%);
+            white-space: nowrap;
         }
 
-        .topbar-right {
-            display: flex;
-            align-items: center;
-            gap: 8px;
+        .week-cols { display: grid; grid-template-columns: repeat(7,1fr); flex: 1; position: relative; }
+        .week-day-col {
+            border-right: 1px solid var(--main-border);
+            position: relative; background: var(--col-other);
         }
+        .week-day-col:last-child { border-right: none; }
+        .week-day-col.today-col { background: var(--col-today); }
 
-        .count-pill {
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            padding: 3px 9px;
-            border-radius: 999px;
-            border: 1px solid var(--border);
-            background: var(--surface);
-            font-size: 0.72rem;
-            color: var(--muted);
+        .hour-line {
+            position: absolute; left: 0; right: 0; height: 1px;
+            background: var(--main-border); pointer-events: none;
         }
-
-        .filter-label {
-            font-size: 0.75rem;
-            color: var(--muted2);
+        .now-line {
+            position: absolute; left: 0; right: 0; height: 2px;
+            background: var(--accent); z-index: 3; pointer-events: none;
         }
-
-        /* ─── INPUT AREA ────────────────────────── */
-        .input-area {
-            padding: 12px 20px;
-            border-bottom: 1px solid var(--border-soft);
-            flex-shrink: 0;
-        }
-
-        .input-compose {
-            display: flex;
-            gap: 8px;
-            align-items: stretch;
-        }
-
-        .input-compose input {
-            flex: 1;
-            padding: 9px 14px;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            color: var(--text);
-            font: inherit;
-            font-size: 0.88rem;
-            outline: none;
-            transition: border-color 0.15s;
-            min-width: 0;
-        }
-
-        .input-compose input::placeholder { color: var(--muted); }
-        .input-compose input:focus { border-color: var(--accent); }
-
-        .btn-add {
-            padding: 9px 16px;
+        .now-line::before {
+            content: '';
+            position: absolute; left: -4px; top: -4px;
+            width: 10px; height: 10px; border-radius: 50%;
             background: var(--accent);
-            color: #fff;
-            border: none;
-            border-radius: 8px;
-            font: inherit;
-            font-size: 0.85rem;
-            font-weight: 600;
-            cursor: pointer;
-            white-space: nowrap;
-            transition: opacity 0.15s, transform 0.1s;
         }
 
-        .btn-add:hover { opacity: 0.88; }
-        .btn-add:active { transform: scale(0.97); }
-
-        /* ─── STATUS ────────────────────────────── */
-        .status {
-            display: none;
-            padding: 7px 20px;
-            font-size: 0.8rem;
-            border-bottom: 1px solid transparent;
-            flex-shrink: 0;
+        /* Event cards */
+        .ev-card {
+            position: absolute; left: 3px; right: 3px;
+            border-radius: 8px; padding: 4px 7px;
+            overflow: hidden; cursor: pointer;
+            transition: filter 0.12s, transform 0.1s, box-shadow 0.12s;
+            z-index: 2; min-height: 18px;
+            border-left: 3px solid rgba(0,0,0,0.15);
+        }
+        .ev-card:hover { filter: brightness(0.93); transform: scale(1.015); z-index: 5; box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
+        .ev-title {
+            font-size: 0.71rem; font-weight: 600; line-height: 1.3;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .ev-time {
+            font-size: 0.62rem; opacity: 0.72; margin-top: 1px; white-space: nowrap;
         }
 
-        .status.success {
-            display: block;
-            color: var(--task);
-            background: rgba(52, 211, 153, 0.07);
-            border-color: rgba(52, 211, 153, 0.15);
+        /* ═══ MONTH VIEW ════════════════════════════════════════ */
+        .month-view { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+        .month-head {
+            display: grid; grid-template-columns: repeat(7,1fr);
+            background: rgba(255,255,255,0.32);
+            border-bottom: 1px solid var(--main-border); flex-shrink: 0;
+        }
+        .month-wd {
+            padding: 8px 4px; text-align: center; font-size: 0.62rem;
+            font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.06em; color: var(--main-muted);
+        }
+        .month-grid {
+            display: grid; grid-template-columns: repeat(7,1fr);
+            grid-auto-rows: 1fr; flex: 1; overflow-y: auto;
+        }
+        .month-cell {
+            border-right: 1px solid var(--main-border);
+            border-bottom: 1px solid var(--main-border);
+            padding: 5px; cursor: pointer;
+            transition: background 0.1s; background: var(--col-other);
+            min-height: 90px; overflow: hidden;
+        }
+        .month-cell:hover { background: rgba(255,255,255,0.52); }
+        .month-cell.today-cell { background: rgba(255,255,255,0.78); }
+        .month-cell.other-month { opacity: 0.42; }
+        .m-day-num {
+            font-size: 0.75rem; font-weight: 600; color: var(--main-text);
+            margin-bottom: 3px; width: 22px; height: 22px;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 50%;
+        }
+        .month-cell.today-cell .m-day-num { background: var(--accent); color: #fff; }
+        .m-ev-chip {
+            font-size: 0.62rem; padding: 2px 5px; border-radius: 4px;
+            margin-bottom: 1px; white-space: nowrap; overflow: hidden;
+            text-overflow: ellipsis; cursor: pointer; display: block;
+        }
+        .m-more { font-size: 0.62rem; color: var(--main-muted); padding: 1px 3px; }
+
+        /* ═══ DAY VIEW ════════════════════════════════════════ */
+        .day-view { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+        .day-head {
+            padding: 12px 18px; background: rgba(255,255,255,0.4);
+            border-bottom: 1px solid var(--main-border); flex-shrink: 0;
+        }
+        .day-head-date { font-size: 1.35rem; font-weight: 700; color: var(--main-text); }
+        .day-body-wrap { flex: 1; overflow-y: auto; }
+        .day-body { display: flex; position: relative; min-height: calc((23 - 7) * var(--hour-h)); }
+        .day-time-col {
+            width: 54px; flex-shrink: 0;
+            border-right: 1px solid var(--main-border); position: relative;
+        }
+        .day-events-col {
+            flex: 1; position: relative; background: var(--col-today);
         }
 
-        .status.error {
-            display: block;
-            color: var(--danger);
-            background: rgba(248, 113, 113, 0.07);
-            border-color: rgba(248, 113, 113, 0.15);
+        /* ═══ MODALS ════════════════════════════════════════ */
+        .modal {
+            position: fixed; inset: 0; display: none; align-items: center;
+            justify-content: center; background: rgba(0,0,0,0.45);
+            z-index: 200; padding: 20px;
+        }
+        .modal.open { display: flex; }
+        .modal-card {
+            background: #fff; border-radius: 16px;
+            width: min(520px, 100%); max-height: 90vh; overflow-y: auto;
+            box-shadow: 0 24px 64px rgba(0,0,0,0.2);
+            animation: floatIn 0.22s cubic-bezier(0.16,1,0.3,1);
+            color: var(--main-text);
+        }
+        .modal-head {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 16px 20px; border-bottom: 1px solid #f0f0f5;
+        }
+        .modal-head-title { font-size: 0.92rem; font-weight: 700; color: var(--main-text); }
+        .modal-body { padding: 20px; }
+
+        /* Form elements inside modals */
+        .modal-card input[type="text"],
+        .modal-card input[type="date"],
+        .modal-card input[type="time"],
+        .modal-card input[type="number"],
+        .modal-card select {
+            background: #f8f8fc; border: 1.5px solid #e4e4f0;
+            border-radius: 9px; padding: 9px 12px; font: inherit;
+            font-size: 0.86rem; color: var(--main-text); outline: none;
+            transition: border-color 0.15s; width: 100%;
+        }
+        .modal-card input:focus,
+        .modal-card select:focus { border-color: var(--accent); }
+        .modal-card input[type="checkbox"] {
+            width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer;
         }
 
-        /* ─── LIST AREA ─────────────────────────── */
-        .list-area {
-            flex: 1;
-            overflow-y: auto;
+        .field-label { font-size: 0.72rem; color: #6b7280; margin-bottom: 4px; font-weight: 500; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+        .form-grid > .full { grid-column: span 2; }
+        .form-row {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 12px; padding: 8px 0; border-bottom: 1px solid #f0f0f5;
+        }
+        .form-row:last-child { border-bottom: none; }
+        .form-row span { font-size: 0.84rem; color: var(--main-text); }
+
+        .settings-block { margin-bottom: 22px; }
+        .settings-block-title {
+            font-size: 0.62rem; font-weight: 700; letter-spacing: 0.08em;
+            text-transform: uppercase; color: #9ca3af; margin-bottom: 10px;
         }
 
-        .item-row {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 10px 20px;
-            border-bottom: 1px solid var(--border-soft);
-            transition: background 0.1s;
-            animation: fadeUp 0.3s ease both;
-        }
-
-        .item-row:hover { background: var(--surface); }
-
-        .item-stripe {
-            width: 3px;
-            min-height: 30px;
-            border-radius: 2px;
-            flex-shrink: 0;
-            align-self: stretch;
-        }
-
-        .item-row.event .item-stripe { background: var(--event); }
-        .item-row.task .item-stripe { background: var(--task); }
-
-        .item-content {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .item-title {
-            font-size: 0.88rem;
-            font-weight: 500;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            margin-bottom: 2px;
-        }
-
-        .item-meta-row {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .item-time {
-            font-size: 0.72rem;
-            color: var(--muted);
-            font-variant-numeric: tabular-nums;
-        }
-
-        .item-loc {
-            font-size: 0.72rem;
-            color: var(--muted2);
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            max-width: 140px;
-        }
-
-        .item-type-badge {
-            font-size: 0.62rem;
-            font-weight: 700;
-            letter-spacing: 0.06em;
-            text-transform: uppercase;
-            padding: 2px 7px;
-            border-radius: 4px;
-            flex-shrink: 0;
-        }
-
-        .item-row.event .item-type-badge {
-            background: rgba(56, 189, 248, 0.1);
-            color: var(--event);
-        }
-
-        .item-row.task .item-type-badge {
-            background: rgba(52, 211, 153, 0.1);
-            color: var(--task);
-        }
-
-        .item-actions-row {
-            display: flex;
-            gap: 4px;
-            opacity: 0;
-            transition: opacity 0.12s;
-            flex-shrink: 0;
-        }
-
-        .item-row:hover .item-actions-row { opacity: 1; }
+        .profile-box { display: flex; align-items: center; gap: 12px; padding: 8px 0 14px; }
 
         .icon-btn {
-            width: 27px;
-            height: 27px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 6px;
-            border: 1px solid var(--border);
-            background: var(--surface2);
-            color: var(--muted);
-            cursor: pointer;
-            font-size: 0.78rem;
-            transition: all 0.12s;
-            padding: 0;
-            font: inherit;
+            width: 30px; height: 30px; display: flex; align-items: center;
+            justify-content: center; border-radius: 8px; border: 1.5px solid #e5e7eb;
+            background: #f9fafb; color: #6b7280; cursor: pointer;
+            font-size: 0.82rem; transition: all 0.12s; padding: 0; font: inherit;
         }
-
-        .icon-btn:hover { color: var(--text); background: var(--surface); }
-        .icon-btn.danger:hover { color: var(--danger); border-color: rgba(248,113,113,0.3); background: rgba(248,113,113,0.06); }
-
-        .empty-state {
-            padding: 48px 20px;
-            text-align: center;
-            color: var(--muted);
-        }
-
-        .empty-state-icon { font-size: 2.2rem; margin-bottom: 10px; opacity: 0.4; }
-        .empty-state p { font-size: 0.85rem; }
-
-        /* ─── MODALS ────────────────────────────── */
-        .modal {
-            position: fixed;
-            inset: 0;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            background: rgba(0, 0, 0, 0.7);
-            z-index: 200;
-            padding: 20px;
-        }
-
-        .modal.open { display: flex; }
-
-        .modal-card {
-            background: #111116;
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            width: min(520px, 100%);
-            max-height: 90vh;
-            overflow-y: auto;
-            animation: floatIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-
-        .modal-head {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 14px 18px;
-            border-bottom: 1px solid var(--border-soft);
-        }
-
-        .modal-head-title {
-            font-size: 0.88rem;
-            font-weight: 700;
-        }
-
-        .modal-body { padding: 18px; }
-
-        /* ─── SETTINGS ──────────────────────────── */
-        .settings-block { margin-bottom: 22px; }
-
-        .settings-block-title {
-            font-size: 0.63rem;
-            font-weight: 700;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            color: var(--muted2);
-            margin-bottom: 10px;
-        }
-
-        .setting-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-            padding: 8px 0;
-            border-bottom: 1px solid var(--border-soft);
-        }
-
-        .setting-row:last-child { border-bottom: none; }
-
-        .setting-row label, .setting-row span {
-            font-size: 0.84rem;
-            color: var(--text);
-        }
-
-        .profile-box {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 8px 0 14px;
-        }
-
-        /* ─── FORM INPUTS ───────────────────────── */
-        input[type="text"],
-        input[type="date"],
-        input[type="time"],
-        input[type="number"],
-        select {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 7px;
-            padding: 8px 11px;
-            font: inherit;
-            font-size: 0.84rem;
-            color: var(--text);
-            outline: none;
-            transition: border-color 0.15s;
-            width: 100%;
-        }
-
-        input:focus, select:focus { border-color: var(--accent); }
-
-        input[type="checkbox"] {
-            width: 15px;
-            height: 15px;
-            accent-color: var(--accent);
-            cursor: pointer;
-            flex-shrink: 0;
-        }
-
-        .form-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-bottom: 10px;
-        }
-
-        .form-grid > .full { grid-column: span 2; }
-
-        .field-label {
-            font-size: 0.72rem;
-            color: var(--muted);
-            margin-bottom: 4px;
-        }
-
-        /* ─── UTILITY ───────────────────────────── */
-        .hidden { display: none !important; }
+        .icon-btn:hover { background: #f0f0f8; color: var(--main-text); }
 
         .btn-sm {
-            padding: 7px 13px;
-            background: var(--surface2);
-            color: var(--text);
-            border: 1px solid var(--border);
-            border-radius: 7px;
-            font: inherit;
-            font-size: 0.8rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.12s;
+            padding: 7px 14px; background: #f3f4f6; color: var(--main-text);
+            border: 1.5px solid #e5e7eb; border-radius: 8px; font: inherit;
+            font-size: 0.8rem; font-weight: 500; cursor: pointer; transition: all 0.12s;
         }
-
-        .btn-sm:hover { background: #27272e; border-color: #3f3f48; }
+        .btn-sm:hover { background: #e5e7eb; }
 
         .btn-accent {
-            padding: 8px 16px;
-            background: var(--accent);
-            color: #fff;
-            border: none;
-            border-radius: 7px;
-            font: inherit;
-            font-size: 0.84rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: opacity 0.12s;
+            padding: 8px 18px; background: var(--accent); color: #fff;
+            border: none; border-radius: 8px; font: inherit;
+            font-size: 0.86rem; font-weight: 600; cursor: pointer; transition: opacity 0.12s;
         }
-
         .btn-accent:hover { opacity: 0.88; }
 
-        .btn-danger {
-            color: var(--danger) !important;
-            border-color: rgba(248,113,113,0.25) !important;
-        }
+        .btn-danger { color: #ef4444 !important; border-color: rgba(239,68,68,0.3) !important; }
 
-        /* ─── SCROLLBAR ─────────────────────────── */
-        ::-webkit-scrollbar { width: 4px; }
+        .edit-status { margin-top: 10px; font-size: 0.8rem; min-height: 18px; }
+
+        /* Sidebar overlay for mobile */
+        .sb-overlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.5); z-index: 40;
+        }
+        .sb-overlay.visible { display: block; }
+
+        /* ═══ UTILITY ════════════════════════════════════════ */
+        .hidden { display: none !important; }
+
+        /* ═══ SCROLLBAR ════════════════════════════════════════ */
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+        ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 3px; }
 
-        /* ─── ANIMATIONS ────────────────────────── */
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-
-        @keyframes fadeUp {
-            from { opacity: 0; transform: translateY(6px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateX(-12px); }
-            to { opacity: 1; transform: translateX(0); }
-        }
-
-        @keyframes floatIn {
-            from { opacity: 0; transform: translateY(10px) scale(0.97); }
-            to { opacity: 1; transform: translateY(0) scale(1); }
-        }
+        /* ═══ ANIMATIONS ════════════════════════════════════ */
+        @keyframes fadeUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes slideIn { from { opacity:0; transform:translateX(-16px); } to { opacity:1; transform:translateX(0); } }
+        @keyframes floatIn { from { opacity:0; transform:translateY(12px) scale(0.96); } to { opacity:1; transform:translateY(0) scale(1); } }
 
         body.reduced-motion *, body.reduced-motion *::before, body.reduced-motion *::after {
-            animation: none !important;
-            transition: none !important;
+            animation: none !important; transition: none !important;
         }
 
-        /* ─── RESPONSIVE ────────────────────────── */
-        @media (max-width: 680px) {
-            .sidebar { display: none; }
-            .item-row { padding: 10px 14px; }
-            .input-area, .main-topbar { padding-left: 14px; padding-right: 14px; }
+        /* ═══ RESPONSIVE ════════════════════════════════════════ */
+        @media (max-width: 900px) {
+            :root { --sb-width: 220px; }
+            .main-title { font-size: 1rem; }
+            .wdh-num { font-size: 1.25rem; }
+        }
+
+        @media (max-width: 640px) {
+            .sidebar {
+                position: fixed; top: 0; left: 0; height: 100%;
+                transform: translateX(-100%);
+                box-shadow: 4px 0 24px rgba(0,0,0,0.35);
+            }
+            .sidebar.open { transform: translateX(0); }
+            .menu-toggle { display: flex; }
+            .btn-today { display: none; }
+            .main-title { font-size: 0.92rem; }
+            .main-topbar { padding: 0 10px; gap: 6px; }
+            .quick-add-bar { padding: 8px 10px; }
+            .btn-add-ev { padding: 6px 10px; font-size: 0.78rem; }
+            .view-toggle { display: none; }
+            /* Show 4 days on mobile week view */
+            .week-days-head { grid-template-columns: repeat(4,1fr); }
+            .week-cols { grid-template-columns: repeat(4,1fr); }
+            .week-day-col:nth-child(n+5) { display: none; }
+            .wdh:nth-child(n+5) { display: none; }
         }
     </style>
 </head>
 <body>
-
-<!-- ═══ AUTH ════════════════════════════════════════════ -->
+<!-- ═══ AUTH ═══════════════════════════════════════════════ -->
 <section id="authView">
     <div class="login-card">
         <div class="login-icon">📅</div>
-        <h1>Calendar AI</h1>
-        <p>Scrie în română ce vrei să faci —<br>noi ne ocupăm de tot restul.</p>
-        <button class="btn-login" id="loginButton" type="button">Continuă cu Google</button>
-        <div class="status" id="authStatus" style="margin-top:12px;border-radius:7px;border:1px solid;padding:8px 12px;"></div>
+        <h1>Calendar</h1>
+        <p>Smart calendar with weather &amp; Google Calendar.<br>Sign in to get started.</p>
+        <button class="btn-login" id="loginButton" type="button">Continue with Google</button>
+        <div class="auth-status" id="authStatus"></div>
     </div>
 </section>
 
-<!-- ═══ APP ══════════════════════════════════════════════ -->
+<!-- ═══ APP ═══════════════════════════════════════════════ -->
 <section id="appView">
+    <div class="sb-overlay" id="sbOverlay"></div>
     <div class="shell">
 
         <!-- SIDEBAR -->
-        <aside class="sidebar">
+        <aside class="sidebar" id="sidebar">
             <div class="sidebar-profile">
                 <div class="avatar-wrap">
                     <div class="avatar-bg"></div>
                     <img id="profilePhoto" class="avatar-img hidden" alt="">
                 </div>
                 <div class="profile-info">
-                    <div class="profile-name" id="sessionLabel">Calendar AI</div>
+                    <div class="profile-name" id="sessionLabel">Calendar</div>
                     <div class="profile-email-sidebar" id="profileEmail"></div>
                 </div>
             </div>
 
-            <div class="sidebar-section">
-                <div class="sidebar-section-label">Calendar</div>
+            <!-- Weather Widget -->
+            <div class="weather-widget" id="weatherWidget">
+                <span class="weather-loading">Loading weather…</span>
+            </div>
+
+            <!-- Mini Calendar -->
+            <div class="sb-section">
                 <div class="cal-header">
                     <span class="cal-title" id="calendarTitle">—</span>
                     <div class="cal-nav-btns">
@@ -809,133 +726,204 @@
                     </div>
                 </div>
                 <div class="cal-weekdays">
-                    <div class="cal-wd">Lu</div>
-                    <div class="cal-wd">Ma</div>
-                    <div class="cal-wd">Mi</div>
-                    <div class="cal-wd">Jo</div>
-                    <div class="cal-wd">Vi</div>
-                    <div class="cal-wd">Sâ</div>
-                    <div class="cal-wd">Du</div>
+                    <div class="cal-wd">Mo</div><div class="cal-wd">Tu</div>
+                    <div class="cal-wd">We</div><div class="cal-wd">Th</div>
+                    <div class="cal-wd">Fr</div><div class="cal-wd">Sa</div>
+                    <div class="cal-wd">Su</div>
                 </div>
                 <div class="cal-grid" id="calendarGrid"></div>
+            </div>
 
-                <div class="legend-row">
-                    <span class="legend-item"><span class="dot-lg dot event"></span>Eveniment</span>
-                    <span class="legend-item"><span class="dot-lg dot task"></span>Task</span>
+            <!-- My Calendars -->
+            <div class="sb-section">
+                <div class="sb-section-head" id="myCalHead">
+                    My Calendars <span class="chev">▾</span>
+                </div>
+                <div class="sb-section-body" id="myCalBody">
+                    <label class="sb-check-item">
+                        <input type="checkbox" id="filterEvents" checked> Events
+                    </label>
+                    <label class="sb-check-item">
+                        <input type="checkbox" id="filterTasks" checked> Tasks
+                    </label>
+                </div>
+            </div>
+
+            <!-- Categories -->
+            <div class="sb-section">
+                <div class="sb-section-head" id="catHead">
+                    Categories <span class="chev">▾</span>
+                </div>
+                <div class="sb-section-body" id="catBody">
+                    <div class="sb-cat-item"><span class="cat-dot" style="background:#818cf8"></span>Work</div>
+                    <div class="sb-cat-item"><span class="cat-dot" style="background:#34d399"></span>Personal</div>
+                    <div class="sb-cat-item"><span class="cat-dot" style="background:#f59e0b"></span>Education</div>
                 </div>
             </div>
 
             <div class="sidebar-footer">
-                <button class="btn-sidebar" id="settingsToggle" type="button">⚙ Setări</button>
-                <button class="btn-sidebar" id="logoutButton" type="button">↩ Ieși</button>
+                <button class="btn-sb" id="settingsToggle" type="button">⚙ Settings</button>
+                <button class="btn-sb" id="logoutButton" type="button">↩ Sign out</button>
             </div>
         </aside>
 
-        <!-- MAIN CONTENT -->
+        <!-- MAIN -->
         <main class="main">
+            <!-- Topbar -->
             <div class="main-topbar">
-                <span class="main-date-label" id="selectedDateLabel">Astăzi</span>
+                <div class="topbar-left">
+                    <button class="menu-toggle" id="menuToggle" type="button">☰</button>
+                    <h1 class="main-title" id="mainTitle">Loading…</h1>
+                    <button class="btn-today" id="todayMainBtn" type="button">Today</button>
+                    <div class="nav-btns">
+                        <button class="nav-btn" id="prevBtn" type="button">‹</button>
+                        <button class="nav-btn" id="nextBtn" type="button">›</button>
+                    </div>
+                </div>
                 <div class="topbar-right">
-                    <span class="count-pill">
-                        <span class="dot event"></span>
-                        <span id="listMeta">0</span>
-                    </span>
-                    <span class="filter-label" id="filterMeta"></span>
+                    <div class="view-toggle">
+                        <button class="view-btn" data-view="month" type="button">Month</button>
+                        <button class="view-btn active" data-view="week" type="button">Week</button>
+                        <button class="view-btn" data-view="day" type="button">Day</button>
+                    </div>
+                    <button class="btn-add-ev" id="addEventBtn" type="button">+ Add</button>
                 </div>
             </div>
 
-            <div class="input-area">
-                <div class="input-compose">
-                    <input id="phrase" type="text" placeholder="Ex: mâine la 12 cumpăr legume · weekend la service · peste 20min fac mâncare">
-                    <button class="btn-add" id="submitButton" type="button">Adaugă</button>
+            <!-- Status -->
+            <div class="status-bar" id="appStatus"></div>
+
+            <!-- Quick-add -->
+            <div class="quick-add-bar">
+                <div class="quick-add-inner">
+                    <input id="phrase" class="quick-add-input" type="text"
+                        placeholder="Add event or task — e.g. team meeting tomorrow at 10am · buy groceries Saturday">
+                    <button class="btn-quick-add" id="submitButton" type="button">Add</button>
                 </div>
             </div>
 
-            <div class="status" id="appStatus"></div>
+            <!-- Calendar views -->
+            <div class="cal-container">
+                <!-- WEEK VIEW -->
+                <div class="week-view" id="weekView">
+                    <div class="week-head-wrap">
+                        <div class="week-tz-gap" id="tzLabel">GMT</div>
+                        <div class="week-days-head" id="weekDaysHead"></div>
+                    </div>
+                    <div class="week-body-wrap" id="weekBodyWrap">
+                        <div class="week-body">
+                            <div class="week-time-col" id="weekTimeCol"></div>
+                            <div class="week-cols" id="weekCols"></div>
+                        </div>
+                    </div>
+                </div>
 
-            <div class="list-area">
-                <div id="items"></div>
+                <!-- MONTH VIEW -->
+                <div class="month-view hidden" id="monthView">
+                    <div class="month-head">
+                        <div class="month-wd">Mon</div><div class="month-wd">Tue</div>
+                        <div class="month-wd">Wed</div><div class="month-wd">Thu</div>
+                        <div class="month-wd">Fri</div><div class="month-wd">Sat</div>
+                        <div class="month-wd">Sun</div>
+                    </div>
+                    <div class="month-grid" id="monthGrid"></div>
+                </div>
+
+                <!-- DAY VIEW -->
+                <div class="day-view hidden" id="dayView">
+                    <div class="day-head">
+                        <div class="day-head-date" id="dayHeadDate">Today</div>
+                    </div>
+                    <div class="day-body-wrap">
+                        <div class="day-body">
+                            <div class="day-time-col" id="dayTimeCol"></div>
+                            <div class="day-events-col" id="dayEventsCol"></div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </main>
-
     </div>
 </section>
 
-<!-- ═══ SETTINGS MODAL ═══════════════════════════════════ -->
+<!-- ═══ SETTINGS MODAL ════════════════════════════════════ -->
 <div class="modal" id="settingsModal">
     <div class="modal-card" style="width:min(560px,100%)">
         <div class="modal-head">
-            <span class="modal-head-title">Setări</span>
+            <span class="modal-head-title">Settings</span>
             <button class="icon-btn" id="closeSettingsButton" type="button">✕</button>
         </div>
         <div class="modal-body">
-
             <div class="settings-block">
-                <div class="settings-block-title">Profil</div>
+                <div class="settings-block-title">Profile</div>
                 <div class="profile-box">
-                    <img class="avatar-img hidden" id="settingsPhoto" alt="" style="position:relative;width:38px;height:38px;border-radius:10px;object-fit:cover;">
+                    <img class="avatar-img hidden" id="settingsPhoto" alt=""
+                        style="position:relative;width:40px;height:40px;border-radius:10px;object-fit:cover;">
                     <div>
-                        <div style="font-size:0.87rem;font-weight:600;" id="profileName">—</div>
-                        <div style="font-size:0.75rem;color:var(--muted);">Google</div>
+                        <div style="font-size:.87rem;font-weight:600;color:var(--main-text);" id="profileName">—</div>
+                        <div style="font-size:.75rem;color:#9ca3af;">Google Account</div>
                     </div>
                 </div>
-                <div style="margin-bottom:4px;" class="field-label">Nome afișat</div>
-                <input id="displayNameSetting" type="text" placeholder="Lăsați gol pentru a folosi numele Google">
+                <div class="field-label">Display name</div>
+                <input id="displayNameSetting" type="text" placeholder="Leave blank to use Google name">
             </div>
 
             <div class="settings-block">
-                <div class="settings-block-title">Afișare</div>
-                <div class="setting-row">
-                    <span>Animații</span>
+                <div class="settings-block-title">Display</div>
+                <div class="form-row">
+                    <span>Animations</span>
                     <input id="animationsSetting" type="checkbox">
                 </div>
-                <div class="setting-row">
-                    <span>Afișează toată luna</span>
-                    <input id="showMonthSetting" type="checkbox">
+                <div class="form-row">
+                    <span>Default view</span>
+                    <select id="defaultViewSetting" style="width:auto;">
+                        <option value="week">Week</option>
+                        <option value="month">Month</option>
+                        <option value="day">Day</option>
+                    </select>
                 </div>
                 <div style="padding-top:10px;">
-                    <button class="btn-sm" id="todayButton" type="button">Salt la astăzi</button>
+                    <button class="btn-sm" id="todayButton" type="button">Jump to today</button>
                 </div>
             </div>
 
             <div class="settings-block">
-                <div class="settings-block-title">Sunete</div>
-                <div class="setting-row">
-                    <span>Sunete active</span>
+                <div class="settings-block-title">Sounds</div>
+                <div class="form-row">
+                    <span>Sound effects</span>
                     <input id="soundEnabledSetting" type="checkbox">
                 </div>
-                <div class="setting-row">
-                    <span>Volum (0–1)</span>
+                <div class="form-row">
+                    <span>Volume (0–1)</span>
                     <input id="soundVolumeSetting" type="number" min="0" max="1" step="0.05" style="width:72px;">
                 </div>
                 <div style="padding-top:10px;">
-                    <button class="btn-sm" id="testSoundButton" type="button">Test sunet</button>
+                    <button class="btn-sm" id="testSoundButton" type="button">Test sound</button>
                 </div>
             </div>
 
             <div class="settings-block">
-                <div class="settings-block-title">Notificări & Calendar</div>
-                <div class="setting-row">
-                    <span>Notificări web</span>
+                <div class="settings-block-title">Notifications &amp; Calendar</div>
+                <div class="form-row">
+                    <span>Web notifications</span>
                     <input id="notificationsSetting" type="checkbox">
                 </div>
-                <div class="setting-row">
-                    <span>Lead minute</span>
+                <div class="form-row">
+                    <span>Lead time (min)</span>
                     <input id="notificationLeadSetting" type="number" min="1" max="120" style="width:72px;">
                 </div>
-                <div class="setting-row">
-                    <span>Durată implicită (min)</span>
+                <div class="form-row">
+                    <span>Default duration (min)</span>
                     <input id="defaultDurationSetting" type="number" min="15" max="480" step="15" style="width:72px;">
                 </div>
-                <div class="setting-row" style="border-bottom:none;">
-                    <span>Prefix task</span>
+                <div class="form-row" style="border-bottom:none;">
+                    <span>Task prefix</span>
                     <input id="taskPrefixSetting" type="text" style="width:130px;">
                 </div>
                 <div style="padding-top:10px;display:flex;gap:8px;">
-                    <button class="btn-sm" id="notificationPermissionButton" type="button">Permite notificări</button>
+                    <button class="btn-sm" id="notificationPermissionButton" type="button">Allow notifications</button>
                 </div>
             </div>
-
         </div>
     </div>
 </div>
@@ -944,1127 +932,1158 @@
 <div class="modal" id="editModal">
     <div class="modal-card">
         <div class="modal-head">
-            <span class="modal-head-title">Editare</span>
+            <span class="modal-head-title">Edit event</span>
             <button class="icon-btn" id="closeEditButton" type="button">✕</button>
         </div>
         <div class="modal-body">
             <div class="form-grid">
                 <div class="full">
-                    <div class="field-label">Titlu</div>
-                    <input id="editTitle" type="text" placeholder="Titlu eveniment / task">
+                    <div class="field-label">Title</div>
+                    <input id="editTitle" type="text" placeholder="Event / task title">
                 </div>
                 <div>
-                    <div class="field-label">Tip</div>
+                    <div class="field-label">Type</div>
                     <select id="editType">
-                        <option value="event">Eveniment</option>
+                        <option value="event">Event</option>
                         <option value="task">Task</option>
                     </select>
                 </div>
                 <div>
-                    <div class="field-label">Locație</div>
-                    <input id="editLocation" type="text" placeholder="Locație">
+                    <div class="field-label">Location</div>
+                    <input id="editLocation" type="text" placeholder="Location">
                 </div>
                 <div>
-                    <div class="field-label">Data</div>
+                    <div class="field-label">Date</div>
                     <input id="editDate" type="date">
                 </div>
                 <div>
-                    <div class="field-label">Ora</div>
+                    <div class="field-label">Time</div>
                     <input id="editTime" type="time">
                 </div>
             </div>
-            <div class="setting-row" style="margin-bottom:16px;">
-                <span>Toată ziua</span>
+            <div class="form-row" style="margin-bottom:16px;">
+                <span>All day</span>
                 <input id="editAllDay" type="checkbox">
             </div>
             <div style="display:flex;gap:8px;">
-                <button class="btn-accent" id="saveEditButton" type="button">Salvează</button>
-                <button class="btn-sm btn-danger" id="deleteEditButton" type="button">Șterge</button>
+                <button class="btn-accent" id="saveEditButton" type="button">Save</button>
+                <button class="btn-sm btn-danger" id="deleteEditButton" type="button">Delete</button>
             </div>
-            <div class="status" id="editStatus" style="margin-top:10px;border-radius:7px;border:1px solid;padding:8px 12px;"></div>
+            <div class="edit-status" id="editStatus"></div>
         </div>
     </div>
 </div>
-
 <script>
+// ============================================================
+// CONFIG
+// ============================================================
 const APP_CONFIG = {
-            GOOGLE_CLIENT_ID: '316906039508-5fe3accmshpol40r8n7sfgchv8j2m4qq.apps.googleusercontent.com',
-            CALENDAR_ID: 'primary',
-            TIMEZONE: 'Europe/Bucharest'
-        };
+    GOOGLE_CLIENT_ID: '316906039508-5fe3accmshpol40r8n7sfgchv8j2m4qq.apps.googleusercontent.com',
+    CALENDAR_ID: 'primary',
+    TIMEZONE: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+};
+const STORAGE_KEYS = {
+    session: 'calendar-ai-ro-session',
+    settings: 'calendar-ai-ro-settings'
+};
+const defaultSettings = {
+    displayName: '', animations: true, defaultView: 'week',
+    soundEnabled: true, soundVolume: 0.18,
+    notificationsEnabled: false, notificationLeadMinutes: 10,
+    defaultDuration: 60, taskPrefix: '[Task] '
+};
 
-        const STORAGE_KEYS = {
-            session: 'calendar-ai-ro-session',
-            settings: 'calendar-ai-ro-settings'
-        };
+// ============================================================
+// STATE
+// ============================================================
+const state = {
+    accessToken: '', expiresAt: 0, profile: null,
+    wantsSession: false, tokenClient: null,
+    settings: { ...defaultSettings },
+    remoteItems: [],
+    selectedDateKey: dateKey(new Date()),
+    visibleMonth: startOfMonth(new Date()),
+    loadedMonthKey: '',
+    notificationTimers: [],
+    editingItemId: null,
+    currentView: 'week',
+    weekStart: getWeekStart(new Date()),
+    filterEvents: true, filterTasks: true
+};
 
-        const defaultSettings = {
-            displayName: '',
-            animations: true,
-            showMonthItems: false,
-            soundEnabled: true,
-            soundVolume: 0.18,
-            notificationsEnabled: false,
-            notificationLeadMinutes: 10,
-            defaultDuration: 60,
-            taskPrefix: '[Task] '
-        };
+// Romanian + English month/weekday maps
+const months = {
+    ianuarie:0,februarie:1,martie:2,aprilie:3,mai:4,iunie:5,
+    iulie:6,august:7,septembrie:8,octombrie:9,noiembrie:10,decembrie:11,
+    january:0,february:1,march:2,april:3,may:4,june:5,
+    july:6,august:7,september:8,october:9,november:10,december:11
+};
+const weekdays = {
+    luni:1,marti:2,'marți':2,miercuri:3,joi:4,vineri:5,sambata:6,'sâmbătă':6,duminica:7,'duminică':7,
+    monday:1,tuesday:2,wednesday:3,thursday:4,friday:5,saturday:6,sunday:7
+};
 
-        const state = {
-            accessToken: '',
-            expiresAt: 0,
-            profile: null,
-            wantsSession: false,
-            tokenClient: null,
-            settings: { ...defaultSettings },
-            remoteItems: [],
-            selectedDateKey: dateKey(new Date()),
-            visibleMonth: startOfMonth(new Date()),
-            loadedMonthKey: '',
-            notificationTimers: [],
-            editingItemId: null
-        };
+// Event color palette
+const EV_COLORS = [
+    { bg:'#ddd6fe', text:'#5b21b6' },
+    { bg:'#bfdbfe', text:'#1e40af' },
+    { bg:'#a7f3d0', text:'#065f46' },
+    { bg:'#fef08a', text:'#854d0e' },
+    { bg:'#fbcfe8', text:'#9d174d' },
+    { bg:'#fed7aa', text:'#9a3412' }
+];
+function getEvColor(id) {
+    let h = 0;
+    const s = String(id||'0');
+    for (let i=0;i<s.length;i++) { h=((h<<5)-h)+s.charCodeAt(i); h|=0; }
+    return EV_COLORS[Math.abs(h)%EV_COLORS.length];
+}
 
-        const months = {
-            ianuarie: 0, februarie: 1, martie: 2, aprilie: 3, mai: 4, iunie: 5,
-            iulie: 6, august: 7, septembrie: 8, octombrie: 9, noiembrie: 10, decembrie: 11
-        };
+// ============================================================
+// DOM REFS
+// ============================================================
+const authView = document.getElementById('authView');
+const appView = document.getElementById('appView');
+const loginButton = document.getElementById('loginButton');
+const logoutButton = document.getElementById('logoutButton');
+const settingsToggle = document.getElementById('settingsToggle');
+const settingsModal = document.getElementById('settingsModal');
+const closeSettingsButton = document.getElementById('closeSettingsButton');
+const authStatus = document.getElementById('authStatus');
+const appStatus = document.getElementById('appStatus');
+const editStatusEl = document.getElementById('editStatus');
+const phraseInput = document.getElementById('phrase');
+const submitButton = document.getElementById('submitButton');
+const sessionLabel = document.getElementById('sessionLabel');
+const mainTitle = document.getElementById('mainTitle');
+const calendarTitle = document.getElementById('calendarTitle');
+const calendarGrid = document.getElementById('calendarGrid');
+const prevMonthButton = document.getElementById('prevMonthButton');
+const nextMonthButton = document.getElementById('nextMonthButton');
+const todayButton = document.getElementById('todayButton');
+const notificationPermissionButton = document.getElementById('notificationPermissionButton');
+const profilePhoto = document.getElementById('profilePhoto');
+const profileName = document.getElementById('profileName');
+const profileEmail = document.getElementById('profileEmail');
+const displayNameSetting = document.getElementById('displayNameSetting');
+const animationsSetting = document.getElementById('animationsSetting');
+const defaultViewSetting = document.getElementById('defaultViewSetting');
+const soundEnabledSetting = document.getElementById('soundEnabledSetting');
+const soundVolumeSetting = document.getElementById('soundVolumeSetting');
+const notificationsSetting = document.getElementById('notificationsSetting');
+const notificationLeadSetting = document.getElementById('notificationLeadSetting');
+const defaultDurationSetting = document.getElementById('defaultDurationSetting');
+const taskPrefixSetting = document.getElementById('taskPrefixSetting');
+const testSoundButton = document.getElementById('testSoundButton');
+const editModal = document.getElementById('editModal');
+const closeEditButton = document.getElementById('closeEditButton');
+const saveEditButton = document.getElementById('saveEditButton');
+const deleteEditButton = document.getElementById('deleteEditButton');
+const editTitle = document.getElementById('editTitle');
+const editType = document.getElementById('editType');
+const editDate = document.getElementById('editDate');
+const editTime = document.getElementById('editTime');
+const editLocation = document.getElementById('editLocation');
+const editAllDay = document.getElementById('editAllDay');
+const weekView = document.getElementById('weekView');
+const monthView = document.getElementById('monthView');
+const dayView = document.getElementById('dayView');
+const weekDaysHead = document.getElementById('weekDaysHead');
+const weekCols = document.getElementById('weekCols');
+const weekTimeCol = document.getElementById('weekTimeCol');
+const monthGrid = document.getElementById('monthGrid');
+const dayTimeCol = document.getElementById('dayTimeCol');
+const dayEventsCol = document.getElementById('dayEventsCol');
+const dayHeadDate = document.getElementById('dayHeadDate');
+const menuToggle = document.getElementById('menuToggle');
+const sidebar = document.getElementById('sidebar');
+const sbOverlay = document.getElementById('sbOverlay');
+const todayMainBtn = document.getElementById('todayMainBtn');
+const prevBtn = document.getElementById('prevBtn');
+const nextBtn = document.getElementById('nextBtn');
+const addEventBtn = document.getElementById('addEventBtn');
+const filterEventsEl = document.getElementById('filterEvents');
+const filterTasksEl = document.getElementById('filterTasks');
 
-        const weekdays = {
-            luni: 1, marti: 2, marți: 2, miercuri: 3, joi: 4, vineri: 5, sambata: 6, sâmbătă: 6, duminica: 7, duminică: 7
-        };
+// ============================================================
+// DATE UTILITIES
+// ============================================================
+function startOfMonth(d) { return new Date(d.getFullYear(), d.getMonth(), 1); }
+function endOfMonth(d) { return new Date(d.getFullYear(), d.getMonth()+1, 0, 23, 59, 59, 999); }
+function shiftMonth(d, delta) { return new Date(d.getFullYear(), d.getMonth()+delta, 1); }
 
-        const authView = document.getElementById('authView');
-        const appView = document.getElementById('appView');
-        const loginButton = document.getElementById('loginButton');
-        const logoutButton = document.getElementById('logoutButton');
-        const settingsToggle = document.getElementById('settingsToggle');
-        const settingsModal = document.getElementById('settingsModal');
-        const closeSettingsButton = document.getElementById('closeSettingsButton');
-        const authStatus = document.getElementById('authStatus');
-        const appStatus = document.getElementById('appStatus');
-        const editStatus = document.getElementById('editStatus');
-        const phraseInput = document.getElementById('phrase');
-        const submitButton = document.getElementById('submitButton');
-        const sessionLabel = document.getElementById('sessionLabel');
-        const selectedDateLabel = document.getElementById('selectedDateLabel');
-        const listMeta = document.getElementById('listMeta');
-        const filterMeta = document.getElementById('filterMeta');
-        const itemsBox = document.getElementById('items');
-        const calendarTitle = document.getElementById('calendarTitle');
-        const calendarGrid = document.getElementById('calendarGrid');
-        const prevMonthButton = document.getElementById('prevMonthButton');
-        const nextMonthButton = document.getElementById('nextMonthButton');
-        const todayButton = document.getElementById('todayButton');
-        const notificationPermissionButton = document.getElementById('notificationPermissionButton');
-        const profilePhoto = document.getElementById('profilePhoto');
-        const profileName = document.getElementById('profileName');
-        const profileEmail = document.getElementById('profileEmail');
-        const displayNameSetting = document.getElementById('displayNameSetting');
-        const animationsSetting = document.getElementById('animationsSetting');
-        const showMonthSetting = document.getElementById('showMonthSetting');
-        const soundEnabledSetting = document.getElementById('soundEnabledSetting');
-        const soundVolumeSetting = document.getElementById('soundVolumeSetting');
-        const notificationsSetting = document.getElementById('notificationsSetting');
-        const notificationLeadSetting = document.getElementById('notificationLeadSetting');
-        const defaultDurationSetting = document.getElementById('defaultDurationSetting');
-        const taskPrefixSetting = document.getElementById('taskPrefixSetting');
-        const testSoundButton = document.getElementById('testSoundButton');
-        const editModal = document.getElementById('editModal');
-        const closeEditButton = document.getElementById('closeEditButton');
-        const saveEditButton = document.getElementById('saveEditButton');
-        const deleteEditButton = document.getElementById('deleteEditButton');
-        const editTitle = document.getElementById('editTitle');
-        const editType = document.getElementById('editType');
-        const editDate = document.getElementById('editDate');
-        const editTime = document.getElementById('editTime');
-        const editLocation = document.getElementById('editLocation');
-        const editAllDay = document.getElementById('editAllDay');
+function dateKey(v) {
+    const d = v instanceof Date ? v : new Date(v);
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+function parseDateKey(k) {
+    const [y,m,d] = k.split('-').map(Number);
+    return new Date(y, m-1, d);
+}
+function pad(v) { return String(v).padStart(2,'0'); }
 
-        function startOfMonth(date) {
-            return new Date(date.getFullYear(), date.getMonth(), 1);
+function formatMonth(d) {
+    return new Intl.DateTimeFormat('en-US',{month:'long',year:'numeric'}).format(d);
+}
+function formatLabel(d) {
+    return new Intl.DateTimeFormat('en-US',{weekday:'long',day:'2-digit',month:'long',year:'numeric'}).format(d);
+}
+function formatTime(iso) {
+    return new Intl.DateTimeFormat('en-US',{hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(iso));
+}
+function formatTimeRange(startIso, endIso) {
+    return `${formatTime(startIso)} – ${formatTime(endIso)}`;
+}
+
+function getWeekStart(d) {
+    const dt = new Date(d);
+    const day = dt.getDay();
+    const diff = day === 0 ? -6 : 1 - day; // Monday-first
+    dt.setDate(dt.getDate() + diff);
+    dt.setHours(0,0,0,0);
+    return dt;
+}
+
+// ============================================================
+// WEATHER
+// ============================================================
+const WMO = {
+    0:{i:'☀️',d:'Clear sky'}, 1:{i:'🌤️',d:'Mainly clear'}, 2:{i:'⛅',d:'Partly cloudy'},
+    3:{i:'☁️',d:'Overcast'}, 45:{i:'🌫️',d:'Foggy'}, 48:{i:'🌫️',d:'Foggy'},
+    51:{i:'🌦️',d:'Drizzle'}, 53:{i:'🌦️',d:'Drizzle'}, 55:{i:'🌧️',d:'Heavy drizzle'},
+    61:{i:'🌧️',d:'Light rain'}, 63:{i:'🌧️',d:'Rain'}, 65:{i:'🌧️',d:'Heavy rain'},
+    71:{i:'🌨️',d:'Light snow'}, 73:{i:'❄️',d:'Snow'}, 75:{i:'❄️',d:'Heavy snow'},
+    80:{i:'🌦️',d:'Showers'}, 81:{i:'🌧️',d:'Rain showers'}, 82:{i:'⛈️',d:'Heavy showers'},
+    95:{i:'⛈️',d:'Thunderstorm'}, 96:{i:'⛈️',d:'Thunderstorm'}, 99:{i:'⛈️',d:'Thunderstorm'}
+};
+function wmoInfo(code) {
+    if (WMO[code]) return WMO[code];
+    const keys = Object.keys(WMO).map(Number).sort((a,b)=>a-b);
+    let best = keys[0];
+    for (const k of keys) { if (k <= code) best = k; }
+    return WMO[best] || {i:'🌡️', d:'Weather'};
+}
+
+async function fetchWeather() {
+    const el = document.getElementById('weatherWidget');
+    if (!el) return;
+    // Fallback coordinates: Bucharest, Romania (used when geolocation is unavailable)
+    let lat = 44.4268, lon = 26.1025;
+    try {
+        const pos = await new Promise((res,rej) =>
+            navigator.geolocation.getCurrentPosition(res, rej, {timeout:5000})
+        );
+        lat = pos.coords.latitude;
+        lon = pos.coords.longitude;
+    } catch(_) {}
+    try {
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&current_weather=true&forecast_days=1&timezone=auto`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('weather api');
+        const data = await res.json();
+        const cw = data.current_weather;
+        if (!cw) throw new Error('no data');
+        const {i, d} = wmoInfo(cw.weathercode);
+        const temp = Math.round(cw.temperature);
+        el.innerHTML = `
+            <span class="weather-icon">${i}</span>
+            <div class="weather-info">
+                <div class="weather-temp">${temp}°C</div>
+                <div class="weather-desc">${d}</div>
+            </div>`;
+        // Update timezone label
+        const tzEl = document.getElementById('tzLabel');
+        if (tzEl) {
+            const offset = -new Date().getTimezoneOffset()/60;
+            tzEl.textContent = `GMT${offset>=0?'+':''}${offset}`;
         }
-
-        function endOfMonth(date) {
-            return new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
-        }
-
-        function shiftMonth(date, delta) {
-            return new Date(date.getFullYear(), date.getMonth() + delta, 1);
-        }
-
-        function dateKey(value) {
-            const date = value instanceof Date ? value : new Date(value);
-            return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-        }
-
-        function parseDateKey(key) {
-            const [year, month, day] = key.split('-').map(Number);
-            return new Date(year, month - 1, day);
-        }
-
-        function pad(value) {
-            return String(value).padStart(2, '0');
-        }
-
-        function formatMonth(date) {
-            return new Intl.DateTimeFormat('ro-RO', { month: 'long', year: 'numeric' }).format(date);
-        }
-
-        function formatLabel(date) {
-            return new Intl.DateTimeFormat('ro-RO', { day: '2-digit', month: 'long', year: 'numeric' }).format(date);
-        }
-
-        function formatItemDate(iso, allDay) {
-            const date = new Date(iso);
-            const options = allDay
-                ? { day: '2-digit', month: '2-digit' }
-                : { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' };
-            return new Intl.DateTimeFormat('ro-RO', options).format(date);
-        }
-
-        function setStatus(element, message = '', type = '') {
-            element.textContent = message;
-            element.className = type ? `status ${type}` : 'status';
-        }
-
-        function normalize(input) {
-            return input
-                .trim()
-                .toLowerCase()
-                .replace(/[„”"']/g, ' ')
-                .replace(/ş/g, 'ș')
-                .replace(/ţ/g, 'ț')
-                .replace(/\s+/g, ' ')
-                .trim();
-        }
-
-        function titleCase(text) {
-            return text
-                .split(/\s+/)
-                .filter(Boolean)
-                .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-                .join(' ');
-        }
-
-        function setTime(date, hour, minute) {
-            const next = new Date(date);
-            next.setHours(hour, minute, 0, 0);
-            return next;
-        }
-
-        function addMinutes(date, minutes) {
-            return new Date(date.getTime() + minutes * 60000);
-        }
-
-        function nextWeekday(reference, weekday, skipCurrentWeek = false) {
-            const current = reference.getDay() === 0 ? 7 : reference.getDay();
-            let daysUntil = weekday - current;
-            if (daysUntil < 0 || (daysUntil === 0 && !skipCurrentWeek)) {
-                daysUntil += 7;
-            }
-            if (skipCurrentWeek && daysUntil === 0) {
-                daysUntil = 7;
-            }
-            if (daysUntil === 0) {
-                daysUntil = 7;
-            }
-            const next = new Date(reference);
-            next.setDate(reference.getDate() + daysUntil);
-            return next;
-        }
-
-        function extractDuration(work) {
-            let duration = state.settings.defaultDuration;
-            const match = work.match(/\b(?:pentru|timp de)\s+(\d{1,3})\s*(minute|minut|min|ore|ora|oră)\b/u);
-            if (match) {
-                const amount = Number(match[1]);
-                duration = /or/.test(match[2]) ? amount * 60 : amount;
-                work = work.replace(match[0], ' ');
-            }
-            return { work, duration };
-        }
-
-        function extractRelative(work, reference) {
-            const match = work.match(/\b(?:peste|în|in)\s+(\d{1,3})\s*(minute|minut|min|ore|ora|oră|zile|zi|saptamani|săptămâni|saptamana|săptămâna|luni)\b/u);
-            if (!match) return null;
-            const amount = Number(match[1]);
-            const unit = match[2];
-            const next = new Date(reference);
-            if (/min/.test(unit)) next.setMinutes(next.getMinutes() + amount);
-            else if (/or/.test(unit)) next.setHours(next.getHours() + amount);
-            else if (/zi/.test(unit)) next.setDate(next.getDate() + amount);
-            else if (/sapt/.test(unit) || /săpt/.test(unit)) next.setDate(next.getDate() + amount * 7);
-            else if (/luni/.test(unit)) next.setMonth(next.getMonth() + amount);
-            return { work: work.replace(match[0], ' '), date: next };
-        }
-
-        function extractDate(work, reference) {
-            const explicit = [
-                { pattern: /\bazi\b|\bastăzi\b|\bastazi\b/u, offset: 0 },
-                { pattern: /\bmâine\b|\bmaine\b/u, offset: 1 },
-                { pattern: /\bpoimâine\b|\bpoimaine\b/u, offset: 2 }
-            ];
-
-            for (const item of explicit) {
-                const match = work.match(item.pattern);
-                if (match) {
-                    const next = new Date(reference);
-                    next.setDate(reference.getDate() + item.offset);
-                    return { work: work.replace(match[0], ' '), date: next };
-                }
-            }
-
-            let match = work.match(/\b(?:weekendul viitor|weekend viitor|weekndul viitor|weeknd viitor|week-endul viitor|week-end viitor)\b/u);
-            if (match) {
-                const next = nextWeekday(reference, 6, true);
-                next.setDate(next.getDate() + 7);
-                return { work: work.replace(match[0], ' '), date: next };
-            }
-
-            match = work.match(/\b(?:in weekend|în weekend|in weeknd|în weeknd|in week-end|în week-end|weekendul acesta|weekendul asta|weekend|weeknd|week-end)\b/u);
-            if (match) {
-                return { work: work.replace(match[0], ' '), date: nextWeekday(reference, 6, false) };
-            }
-
-            match = work.match(/\b(\d{1,2})[./-](\d{1,2})(?:[./-](\d{2,4}))?\b/u);
-            if (match) {
-                const day = Number(match[1]);
-                const month = Number(match[2]) - 1;
-                let year = match[3] ? Number(match[3]) : reference.getFullYear();
-                if (year < 100) year += 2000;
-                const next = new Date(reference);
-                next.setFullYear(year, month, day);
-                next.setHours(9, 0, 0, 0);
-                if (!match[3] && next < reference) next.setFullYear(year + 1);
-                return { work: work.replace(match[0], ' '), date: next };
-            }
-
-            match = work.match(/\bpe\s+(\d{1,2})\s+(ianuarie|februarie|martie|aprilie|mai|iunie|iulie|august|septembrie|octombrie|noiembrie|decembrie)(?:\s+(\d{4}))?\b/u);
-            if (match) {
-                const day = Number(match[1]);
-                const month = months[match[2]];
-                let year = match[3] ? Number(match[3]) : reference.getFullYear();
-                const next = new Date(reference);
-                next.setFullYear(year, month, day);
-                next.setHours(9, 0, 0, 0);
-                if (!match[3] && next < reference) next.setFullYear(year + 1);
-                return { work: work.replace(match[0], ' '), date: next };
-            }
-
-            match = work.match(/\b(luni|marti|marți|miercuri|joi|vineri|sambata|sâmbătă|duminica|duminică)(?:\s+(?:viitoare|viitor|urmatoare|următor))?\b/u);
-            if (match) {
-                const skip = /\b(viitoare|viitor|urmatoare|următor)\b/u.test(match[0]);
-                return { work: work.replace(match[0], ' '), date: nextWeekday(reference, weekdays[match[1]], skip) };
-            }
-
-            return null;
-        }
-
-        function extractTime(work) {
-            const patterns = [
-                /\b(?:la|ora)\s*(\d{1,2})[:.](\d{2})\b/u,
-                /\b(?:la ora|la)\s*(\d{1,2})\b/u,
-                /\b(\d{1,2})\s+si\s+jumatate\b/u,
-                /\b(\d{1,2})\s+și\s+jumătate\b/u,
-                /\b(\d{1,2})\s+si\s+un\s+sfert\b/u,
-                /\b(\d{1,2})\s+și\s+un\s+sfert\b/u
-            ];
-
-            for (const pattern of patterns) {
-                const match = work.match(pattern);
-                if (!match) continue;
-                let hour = Number(match[1]);
-                let minute = match[2] ? Number(match[2]) : 0;
-                if (match[0].includes('jum')) minute = 30;
-                if (match[0].includes('sfert')) minute = 15;
-                if (hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59) {
-                    return { work: work.replace(match[0], ' '), time: { hour, minute } };
-                }
-            }
-
-            const period = [
-                { pattern: /\bdimineața\b|\bdimineata\b/u, hour: 9, minute: 0 },
-                { pattern: /\bprânz\b|\bpranz\b/u, hour: 12, minute: 0 },
-                { pattern: /\bdupă-amiază\b|\bdupa-amiaza\b|\bdupă amiază\b|\bdupa amiaza\b/u, hour: 15, minute: 0 },
-                { pattern: /\bdiseară\b|\bdiseara\b|\bseara\b/u, hour: 19, minute: 0 }
-            ].find((item) => item.pattern.test(work));
-
-            if (period) {
-                return { work: work.replace(period.pattern, ' '), time: { hour: period.hour, minute: period.minute } };
-            }
-
-            return null;
-        }
-
-        function extractLocation(work) {
-            const match = work.match(/\b(?:la|în|in)\s+([a-z0-9ăâîșț\-.]+(?:\s+[a-z0-9ăâîșț\-.]+){0,3})\b/u);
-            if (!match) return null;
-            const blocked = ['azi', 'astăzi', 'astazi', 'maine', 'mâine', 'poimaine', 'poimâine', 'weekend', 'weeknd', 'week-end', 'ora', 'minute', 'ore'];
-            const value = match[1].split(/\s+/).filter((word) => !blocked.includes(word)).join(' ').trim();
-            if (!value || /^\d/.test(value)) return null;
-            return { work: work.replace(match[0], ' '), location: titleCase(value) };
-        }
-
-        function extractTitle(work) {
-            return work
-                .replace(/\b(?:trebuie|sa|să|iar|si|și|in|în|la|pe)\b/gu, ' ')
-                .replace(/\s+/g, ' ')
-                .trim()
-                .replace(/^[\-:,.;\s]+|[\-:,.;\s]+$/g, '');
-        }
-
-        function looksLikeTask(text, allDay) {
-            return allDay || /\b(trebuie|task|todo|to do|de facut|de făcut|de dus|de luat|de cumparat|de cumpărat)\b/u.test(text);
-        }
-
-        function parseRomanian(input) {
-            const reference = new Date();
-            let work = ` ${normalize(input)} `;
-            const durationResult = extractDuration(work);
-            work = durationResult.work;
-
-            let date = null;
-            let time = null;
-            let allDay = false;
-
-            const relative = extractRelative(work, reference);
-            if (relative) {
-                work = relative.work;
-                date = relative.date;
-                time = { hour: date.getHours(), minute: date.getMinutes() };
-            } else {
-                const dateResult = extractDate(work, reference);
-                if (dateResult) {
-                    work = dateResult.work;
-                    date = dateResult.date;
-                }
-
-                const timeResult = extractTime(work);
-                if (timeResult) {
-                    work = timeResult.work;
-                    time = timeResult.time;
-                }
-
-                if (!date && time) {
-                    date = setTime(new Date(reference), time.hour, time.minute);
-                    if (date < reference) date.setDate(date.getDate() + 1);
-                }
-            }
-
-            if (!date) {
-                date = new Date(reference);
-                allDay = true;
-            }
-
-            if (!time && !relative) {
-                allDay = true;
-            }
-
-            let location = null;
-            const locationResult = extractLocation(work);
-            if (locationResult) {
-                work = locationResult.work;
-                location = locationResult.location;
-            }
-
-            const title = extractTitle(work);
-            const type = looksLikeTask(normalize(input), allDay) ? 'task' : 'event';
-            const safeTitle = title ? titleCase(title) : (type === 'task' ? 'Task Nou' : 'Eveniment Nou');
-
-            let start = new Date(date);
-            let end;
-            if (allDay) {
-                start.setHours(9, 0, 0, 0);
-                end = new Date(start);
-                end.setDate(end.getDate() + 1);
-            } else {
-                start = setTime(date, time.hour, time.minute);
-                end = addMinutes(start, durationResult.duration);
-            }
-
-            return {
-                title: safeTitle,
-                type,
-                location,
-                allDay,
-                start,
-                end,
-                original: input.trim()
-            };
-        }
-
-        function stripTaskPrefix(summary) {
-            const prefix = state.settings.taskPrefix || defaultSettings.taskPrefix;
-            return summary.startsWith(prefix) ? summary.slice(prefix.length) : summary;
-        }
-
-        function mapApiEvent(apiEvent) {
-            const rawStart = apiEvent.start?.dateTime || apiEvent.start?.date;
-            const rawEnd = apiEvent.end?.dateTime || apiEvent.end?.date;
-            const allDay = Boolean(apiEvent.start?.date && !apiEvent.start?.dateTime);
-            const typeFromMetadata = apiEvent.extendedProperties?.private?.calendarAiType;
-            const prefixed = (apiEvent.summary || '').startsWith(state.settings.taskPrefix || defaultSettings.taskPrefix);
-            const type = typeFromMetadata || (prefixed ? 'task' : 'event');
-
-            return {
-                id: apiEvent.id,
-                title: stripTaskPrefix(apiEvent.summary || 'Fără titlu'),
-                type,
-                location: apiEvent.location || '',
-                allDay,
-                start: allDay ? `${apiEvent.start.date}T09:00:00` : apiEvent.start.dateTime,
-                end: allDay ? `${apiEvent.end.date}T09:00:00` : apiEvent.end.dateTime,
-                original: apiEvent.description || '',
-                synced: true
-            };
-        }
-
-        function buildPayload(item) {
-            const title = item.type === 'task'
-                ? `${state.settings.taskPrefix}${item.title}`
-                : item.title;
-
-            const payload = {
-                summary: title,
-                description: item.original ? `Text original: ${item.original}` : '',
-                location: item.location || '',
-                reminders: {
-                    useDefault: false,
-                    overrides: [{ method: 'popup', minutes: Math.max(1, Number(state.settings.notificationLeadMinutes || 10)) }]
-                },
-                extendedProperties: {
-                    private: {
-                        calendarAiType: item.type
-                    }
-                }
-            };
-
-            if (item.allDay) {
-                const start = new Date(item.start);
-                const end = new Date(item.end);
-                payload.start = { date: dateKey(start) };
-                payload.end = { date: dateKey(end) };
-            } else {
-                payload.start = { dateTime: new Date(item.start).toISOString(), timeZone: APP_CONFIG.TIMEZONE };
-                payload.end = { dateTime: new Date(item.end).toISOString(), timeZone: APP_CONFIG.TIMEZONE };
-            }
-
-            return payload;
-        }
-
-        function saveSession() {
-            localStorage.setItem(STORAGE_KEYS.session, JSON.stringify({
-                accessToken: state.accessToken,
-                expiresAt: state.expiresAt,
-                profile: state.profile,
-                wantsSession: state.wantsSession
-            }));
-        }
-
-        function loadSession() {
-            try {
-                const raw = localStorage.getItem(STORAGE_KEYS.session);
-                if (!raw) return;
-                const saved = JSON.parse(raw);
-                state.accessToken = saved.accessToken || '';
-                state.expiresAt = Number(saved.expiresAt || 0);
-                state.profile = saved.profile || null;
-                state.wantsSession = Boolean(saved.wantsSession);
-            } catch (_) {
-                localStorage.removeItem(STORAGE_KEYS.session);
-            }
-        }
-
-        function clearSession() {
-            state.accessToken = '';
-            state.expiresAt = 0;
-            state.profile = null;
-            state.wantsSession = false;
-            localStorage.removeItem(STORAGE_KEYS.session);
-        }
-
-        function saveSettings() {
-            localStorage.setItem(STORAGE_KEYS.settings, JSON.stringify(state.settings));
-        }
-
-        function loadSettings() {
-            try {
-                const raw = localStorage.getItem(STORAGE_KEYS.settings);
-                if (!raw) return;
-                state.settings = { ...defaultSettings, ...JSON.parse(raw) };
-            } catch (_) {
-                state.settings = { ...defaultSettings };
-                localStorage.removeItem(STORAGE_KEYS.settings);
-            }
-        }
-
-        function applySettingsToUi() {
-            displayNameSetting.value = state.settings.displayName;
-            animationsSetting.checked = state.settings.animations;
-            showMonthSetting.checked = state.settings.showMonthItems;
-            soundEnabledSetting.checked = state.settings.soundEnabled;
-            soundVolumeSetting.value = String(state.settings.soundVolume);
-            notificationsSetting.checked = state.settings.notificationsEnabled;
-            notificationLeadSetting.value = String(state.settings.notificationLeadMinutes);
-            defaultDurationSetting.value = String(state.settings.defaultDuration);
-            taskPrefixSetting.value = state.settings.taskPrefix;
-            document.body.classList.toggle('reduced-motion', !state.settings.animations);
-            updateProfileUi();
-        }
-
-        function updateProfileUi() {
-            const displayName = state.settings.displayName || state.profile?.name || 'Google user';
-            profileName.textContent = displayName;
-            profileEmail.textContent = state.profile?.email || '-';
-            profilePhoto.src = state.profile?.picture || '';
-            profilePhoto.classList.toggle('hidden', !state.profile?.picture);
-            sessionLabel.textContent = displayName;
-        }
-
-        function renderView() {
-            const loggedIn = Boolean(state.accessToken);
-            authView.style.display = loggedIn ? 'none' : 'flex';
-            appView.style.display = loggedIn ? 'block' : 'none';
-            updateProfileUi();
-        }
-
-        async function fetchJson(url, options = {}) {
-            const response = await fetch(url, options);
-            if (!response.ok) {
-                const text = await response.text();
-                throw new Error(text || `HTTP ${response.status}`);
-            }
-            if (response.status === 204) {
-                return {};
-            }
-            const text = await response.text();
-            return text ? JSON.parse(text) : {};
-        }
-
-        async function fetchProfile() {
-            state.profile = await fetchJson('https://www.googleapis.com/oauth2/v3/userinfo', {
-                headers: { Authorization: `Bearer ${state.accessToken}` }
-            });
-        }
-
-        async function fetchMonthItems() {
-            calendarGrid.classList.add('fade-out'); // Start transition
-            
-            const monthStart = startOfMonth(state.visibleMonth);
-            const monthEnd = endOfMonth(state.visibleMonth);
-            const monthKey = `${monthStart.getFullYear()}-${pad(monthStart.getMonth() + 1)}`;
-            state.loadedMonthKey = monthKey;
-
-            const params = new URLSearchParams({
-                singleEvents: 'true',
-                orderBy: 'startTime',
-                timeMin: monthStart.toISOString(),
-                timeMax: monthEnd.toISOString(),
-                maxResults: '250'
-            });
-
-            try {
-                const data = await fetchJson(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(APP_CONFIG.CALENDAR_ID)}/events?${params.toString()}`, {
-                    headers: { Authorization: `Bearer ${state.accessToken}` }
-                });
-
-                state.remoteItems = (data.items || []).map(mapApiEvent);
-            } catch (e) {
-                console.error('Fetch failed', e);
-            } finally {
-                renderCalendar();
-                renderList();
-                scheduleNotifications();
-                
-                // Slight delay to ensure DOM update is perceived before fading in
-                setTimeout(() => {
-                    calendarGrid.classList.remove('fade-out');
-                }, 50);
-            }
-        }
-
-        function getVisibleItems() {
-            if (state.settings.showMonthItems) {
-                return [...state.remoteItems].sort((a, b) => new Date(a.start) - new Date(b.start));
-            }
-
-            return state.remoteItems
-                .filter((item) => dateKey(item.start) === state.selectedDateKey)
-                .sort((a, b) => new Date(a.start) - new Date(b.start));
-        }
-
-        function renderList() {
-            const visibleItems = getVisibleItems();
-            const selectedDate = parseDateKey(state.selectedDateKey);
-            selectedDateLabel.textContent = formatLabel(selectedDate);
-            filterMeta.textContent = state.settings.showMonthItems ? 'Toată luna' : 'Data selectată';
-            listMeta.textContent = `${visibleItems.length} rezultate`;
-
-            if (!visibleItems.length) {
-                itemsBox.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📅</div><p>Nicio activitate pentru această zi</p></div>`;
-                return;
-            }
-
-            itemsBox.innerHTML = visibleItems.map((item, index) => `
-                <div class="item-row ${item.type}" style="animation-delay:${index * 45}ms">
-                    <div class="item-stripe"></div>
-                    <div class="item-content">
-                        <div class="item-title">${item.title}</div>
-                        <div class="item-meta-row">
-                            <span class="item-time">${formatItemDate(item.start, item.allDay)}${item.allDay ? ' · tot ziua' : ''}</span>
-                            ${item.location ? `<span class="item-loc">· ${item.location}</span>` : ''}
-                        </div>
-                    </div>
-                    <span class="item-type-badge">${item.type === 'task' ? 'Task' : 'Event'}</span>
-                    <div class="item-actions-row">
-                        <button class="icon-btn" type="button" data-action="edit" data-id="${item.id}" title="Editează">✎</button>
-                        <button class="icon-btn danger" type="button" data-action="delete" data-id="${item.id}" title="Șterge">✕</button>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function renderCalendar() {
-            calendarTitle.textContent = formatMonth(state.visibleMonth);
-            const monthStart = startOfMonth(state.visibleMonth);
-            const firstDay = monthStart.getDay() === 0 ? 7 : monthStart.getDay();
-            const gridStart = new Date(monthStart);
-            gridStart.setDate(monthStart.getDate() - (firstDay - 1));
-
-            const selected = state.selectedDateKey;
-            const todayKey = dateKey(new Date());
-            const monthIndex = state.visibleMonth.getMonth();
-            const cells = [];
-
-            for (let index = 0; index < 42; index += 1) {
-                const current = new Date(gridStart);
-                current.setDate(gridStart.getDate() + index);
-                const currentKey = dateKey(current);
-                const dayItems = state.remoteItems.filter((item) => dateKey(item.start) === currentKey);
-                const taskCount = dayItems.filter((item) => item.type === 'task').length;
-                const eventCount = dayItems.filter((item) => item.type === 'event').length;
-
-                cells.push(`
-                    <button class="cal-day ${current.getMonth() !== monthIndex ? 'muted' : ''} ${currentKey === selected ? 'selected' : ''} ${currentKey === todayKey ? 'today' : ''}" type="button" data-day="${currentKey}">
-                        ${current.getDate()}
-                        <span class="cal-dots">
-                            ${eventCount ? '<span class="dot event"></span>' : ''}
-                            ${taskCount ? '<span class="dot task"></span>' : ''}
-                        </span>
-                    </button>
-                `);
-            }
-
-            calendarGrid.innerHTML = cells.join('');
-        }
-
-        function openEditModal(itemId) {
-            const item = state.remoteItems.find((entry) => entry.id === itemId);
-            if (!item) return;
-
-            state.editingItemId = itemId;
-            editTitle.value = item.title;
-            editType.value = item.type;
-            editLocation.value = item.location || '';
-            editAllDay.checked = item.allDay;
-            editDate.value = dateKey(item.start);
-            editTime.value = item.allDay ? '09:00' : `${pad(new Date(item.start).getHours())}:${pad(new Date(item.start).getMinutes())}`;
-            setStatus(editStatus, '', '');
-            editModal.classList.add('open');
-        }
-
-        function closeEditModal() {
-            editModal.classList.remove('open');
-            state.editingItemId = null;
-            setStatus(editStatus, '', '');
-        }
-
-        function playSound(frequency = 740, duration = 0.08) {
-            if (!state.settings.soundEnabled) return;
-            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-            if (!AudioContextClass) return;
-            const context = new AudioContextClass();
-            const oscillator = context.createOscillator();
-            const gain = context.createGain();
-            oscillator.type = 'sine';
-            oscillator.frequency.value = frequency;
-            gain.gain.value = Math.max(0, Math.min(1, Number(state.settings.soundVolume || 0.18)));
-            oscillator.connect(gain);
-            gain.connect(context.destination);
-            oscillator.start();
-            oscillator.stop(context.currentTime + duration);
-            oscillator.onended = () => context.close();
-        }
-
-        function clearNotificationTimers() {
-            state.notificationTimers.forEach((timer) => clearTimeout(timer));
-            state.notificationTimers = [];
-        }
-
-        function scheduleNotifications() {
-            clearNotificationTimers();
-
-            if (!('Notification' in window) || !state.settings.notificationsEnabled || Notification.permission !== 'granted') {
-                return;
-            }
-
-            const leadMs = Number(state.settings.notificationLeadMinutes || 10) * 60 * 1000;
-            const now = Date.now();
-
-            state.remoteItems.forEach((item) => {
-                const target = new Date(item.start).getTime() - leadMs;
-                if (target <= now || target - now > 24 * 60 * 60 * 1000) {
-                    return;
-                }
-
-                const timer = setTimeout(() => {
-                    new Notification(item.title, {
-                        body: `${item.type === 'task' ? 'Task' : 'Eveniment'} • ${formatItemDate(item.start, item.allDay)}`
-                    });
-                    playSound(item.type === 'task' ? 620 : 820, 0.12);
-                }, target - now);
-
-                state.notificationTimers.push(timer);
-            });
-        }
-
-        async function createItemFromInput() {
-            const text = phraseInput.value.trim();
-            if (!text) {
-                setStatus(appStatus, 'Input gol.', 'error');
-                return;
-            }
-
-            const parsed = parseRomanian(text);
-            const payload = buildPayload({
-                ...parsed,
-                start: parsed.start.toISOString(),
-                end: parsed.end.toISOString()
-            });
-
-            try {
-                await fetchJson(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(APP_CONFIG.CALENDAR_ID)}/events`, {
-                    method: 'POST',
-                    headers: {
-                        Authorization: `Bearer ${state.accessToken}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(payload)
-                });
-
-                phraseInput.value = '';
-                setStatus(appStatus, 'Adăugat.', 'success');
-                playSound(parsed.type === 'task' ? 620 : 820);
-                await fetchMonthItems();
-                phraseInput.focus();
-            } catch (error) {
-                setStatus(appStatus, `Nu am putut adăuga: ${error.message}`, 'error');
-            }
-        }
-
-        async function saveEditedItem() {
-            const item = state.remoteItems.find((entry) => entry.id === state.editingItemId);
-            if (!item) return;
-
-            const allDay = editAllDay.checked;
-            const dateValue = editDate.value || state.selectedDateKey;
-            const timeValue = editTime.value || '09:00';
-            const [year, month, day] = dateValue.split('-').map(Number);
-            const [hour, minute] = timeValue.split(':').map(Number);
-            const startDate = new Date(year, month - 1, day, hour || 9, minute || 0, 0);
-            const endDate = allDay
-                ? new Date(year, month - 1, day + 1, 9, 0, 0)
-                : addMinutes(startDate, Number(state.settings.defaultDuration || 60));
-
-            const updatedItem = {
-                ...item,
-                title: editTitle.value.trim() || item.title,
-                type: editType.value,
-                location: editLocation.value.trim(),
-                allDay,
-                start: startDate.toISOString(),
-                end: endDate.toISOString()
-            };
-
-            try {
-                await fetchJson(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(APP_CONFIG.CALENDAR_ID)}/events/${encodeURIComponent(item.id)}`, {
-                    method: 'PATCH',
-                    headers: {
-                        Authorization: `Bearer ${state.accessToken}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(buildPayload(updatedItem))
-                });
-
-                playSound(760);
-                closeEditModal();
-                await fetchMonthItems();
-            } catch (error) {
-                setStatus(editStatus, `Nu am putut salva: ${error.message}`, 'error');
-            }
-        }
-
-        async function deleteEditedItem() {
-            const item = state.remoteItems.find((entry) => entry.id === state.editingItemId);
-            if (!item) return;
-
-            try {
-                await fetchJson(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(APP_CONFIG.CALENDAR_ID)}/events/${encodeURIComponent(item.id)}`, {
-                    method: 'DELETE',
-                    headers: { Authorization: `Bearer ${state.accessToken}` }
-                });
-            } catch (error) {
-                if (!/HTTP 204/i.test(error.message)) {
-                    setStatus(editStatus, `Nu am putut șterge: ${error.message}`, 'error');
-                    return;
-                }
-            }
-
-            playSound(480, 0.12);
-            closeEditModal();
-            await fetchMonthItems();
-        }
-
-        function bindSettings() {
-            displayNameSetting.addEventListener('input', () => {
-                state.settings.displayName = displayNameSetting.value.trim();
-                saveSettings();
-                updateProfileUi();
-            });
-
-            animationsSetting.addEventListener('change', () => {
-                state.settings.animations = animationsSetting.checked;
-                saveSettings();
-                applySettingsToUi();
-            });
-
-            showMonthSetting.addEventListener('change', () => {
-                state.settings.showMonthItems = showMonthSetting.checked;
-                saveSettings();
-                renderList();
-            });
-
-            soundEnabledSetting.addEventListener('change', () => {
-                state.settings.soundEnabled = soundEnabledSetting.checked;
-                saveSettings();
-            });
-
-            soundVolumeSetting.addEventListener('change', () => {
-                state.settings.soundVolume = Math.max(0, Math.min(1, Number(soundVolumeSetting.value || 0.18)));
-                soundVolumeSetting.value = String(state.settings.soundVolume);
-                saveSettings();
-            });
-
-            notificationsSetting.addEventListener('change', async () => {
-                state.settings.notificationsEnabled = notificationsSetting.checked;
-                saveSettings();
-                if (state.settings.notificationsEnabled && Notification.permission !== 'granted') {
-                    await requestNotificationPermission();
-                }
-                scheduleNotifications();
-            });
-
-            notificationLeadSetting.addEventListener('change', () => {
-                state.settings.notificationLeadMinutes = Math.max(1, Number(notificationLeadSetting.value || 10));
-                notificationLeadSetting.value = String(state.settings.notificationLeadMinutes);
-                saveSettings();
-                scheduleNotifications();
-            });
-
-            defaultDurationSetting.addEventListener('change', () => {
-                state.settings.defaultDuration = Math.max(15, Number(defaultDurationSetting.value || 60));
-                defaultDurationSetting.value = String(state.settings.defaultDuration);
-                saveSettings();
-            });
-
-            taskPrefixSetting.addEventListener('change', () => {
-                state.settings.taskPrefix = taskPrefixSetting.value || defaultSettings.taskPrefix;
-                saveSettings();
-                renderList();
-                renderCalendar();
-            });
-
-            testSoundButton.addEventListener('click', () => playSound(740));
-            todayButton.addEventListener('click', async () => {
-                state.visibleMonth = startOfMonth(new Date());
-                state.selectedDateKey = dateKey(new Date());
-                await fetchMonthItems();
-            });
-        }
-
-        async function requestNotificationPermission() {
-            if (!('Notification' in window)) {
-                setStatus(appStatus, 'Browserul nu suportă notificări.', 'error');
-                return;
-            }
-            const result = await Notification.requestPermission();
-            if (result === 'granted') {
-                setStatus(appStatus, 'Notificările web sunt active.', 'success');
-                scheduleNotifications();
-            } else {
-                setStatus(appStatus, 'Notificările nu au fost permise.', 'error');
-            }
-        }
-
-        function initGoogle() {
-            if (state.tokenClient || typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
-                return;
-            }
-
-            state.tokenClient = google.accounts.oauth2.initTokenClient({
-                client_id: APP_CONFIG.GOOGLE_CLIENT_ID,
-                scope: 'openid email profile https://www.googleapis.com/auth/calendar',
-                callback: async (response) => {
-                    if (!response.access_token) {
-                        setStatus(authStatus, 'Logare eșuată.', 'error');
-                        return;
-                    }
-
-                    state.accessToken = response.access_token;
-                    state.expiresAt = Date.now() + Number(response.expires_in || 3600) * 1000;
-                    state.wantsSession = true;
-
-                    try {
-                        await fetchProfile();
-                        saveSession();
-                        renderView();
-                        applySettingsToUi();
-                        await fetchMonthItems();
-                        phraseInput.focus();
-                    } catch (error) {
-                        setStatus(authStatus, `Google error: ${error.message}`, 'error');
-                    }
-                },
-                error_callback: () => {
-                    setStatus(authStatus, 'Google a blocat autentificarea.', 'error');
-                }
-            });
-        }
-
-        function maybeRestoreSession() {
-            if (state.accessToken && state.expiresAt > Date.now()) {
-                renderView();
-                applySettingsToUi();
-                fetchMonthItems().catch((error) => setStatus(appStatus, error.message, 'error'));
-                return;
-            }
-
-            if (!state.wantsSession) {
-                clearSession();
-                renderView();
-                return;
-            }
-
-            initGoogle();
-            if (state.tokenClient) {
-                state.tokenClient.requestAccessToken({ prompt: '' });
-            }
-        }
-
-        loginButton.addEventListener('click', () => {
-            initGoogle();
-            if (state.tokenClient) {
-                state.tokenClient.requestAccessToken({ prompt: 'consent' });
-            }
+    } catch(_) {
+        el.innerHTML = `<span class="weather-icon">🌡️</span>
+            <div class="weather-info"><div class="weather-temp">—</div>
+            <div class="weather-desc">Weather unavailable</div></div>`;
+    }
+}
+
+// ============================================================
+// STATUS HELPERS
+// ============================================================
+function setStatus(el, msg='', type='') {
+    if (!el) return;
+    el.textContent = msg;
+    if (el.classList.contains('status-bar')) {
+        el.className = type ? `status-bar ${type}` : 'status-bar';
+    } else {
+        el.style.color = type==='error'?'#ef4444':type==='success'?'#16a34a':'';
+    }
+}
+
+// ============================================================
+// NLP PARSING (Romanian + English)
+// ============================================================
+function normalize(input) {
+    return input.trim().toLowerCase()
+        .replace(/[„""']/g,' ').replace(/ş/g,'ș').replace(/ţ/g,'ț')
+        .replace(/\s+/g,' ').trim();
+}
+function titleCase(t) {
+    return t.split(/\s+/).filter(Boolean)
+        .map(p=>p.charAt(0).toUpperCase()+p.slice(1)).join(' ');
+}
+function setTime(d,h,m) { const n=new Date(d); n.setHours(h,m,0,0); return n; }
+function addMinutes(d,m) { return new Date(d.getTime()+m*60000); }
+
+function nextWeekday(ref, wd, skip=false) {
+    const cur = ref.getDay()===0?7:ref.getDay();
+    let diff = wd-cur;
+    if (diff<0||(diff===0&&!skip)) diff+=7;
+    if (skip&&diff===0) diff=7;
+    const n=new Date(ref); n.setDate(ref.getDate()+diff); return n;
+}
+
+function extractDuration(work) {
+    let duration=state.settings.defaultDuration;
+    const m=work.match(/\b(?:pentru|timp de|for)\s+(\d{1,3})\s*(minute?s?|min|ore?s?|oră|hours?)\b/u);
+    if (m) { const a=Number(m[1]); duration=/or|hour/.test(m[2])?a*60:a; work=work.replace(m[0],' '); }
+    return {work,duration};
+}
+
+function extractRelative(work,ref) {
+    const m=work.match(/\b(?:peste|în|in)\s+(\d{1,3})\s*(minute?s?|min|ore?s?|oră|hours?|zile?|days?|saptamani?|săptămâni?|weeks?|luni|months?)\b/u);
+    if (!m) return null;
+    const a=Number(m[1]),u=m[2],n=new Date(ref);
+    if(/min/.test(u)) n.setMinutes(n.getMinutes()+a);
+    else if(/or|hour/.test(u)) n.setHours(n.getHours()+a);
+    else if(/zi|day/.test(u)) n.setDate(n.getDate()+a);
+    else if(/sapt|săpt|week/.test(u)) n.setDate(n.getDate()+a*7);
+    else if(/luni|month/.test(u)) n.setMonth(n.getMonth()+a);
+    return {work:work.replace(m[0],' '),date:n};
+}
+
+function extractDate(work,ref) {
+    const expl=[
+        {p:/\b(?:azi|astăzi|astazi|today)\b/u,o:0},
+        {p:/\b(?:mâine|maine|tomorrow)\b/u,o:1},
+        {p:/\b(?:poimâine|poimaine)\b/u,o:2}
+    ];
+    for (const {p,o} of expl) {
+        const m=work.match(p);
+        if (m) { const n=new Date(ref); n.setDate(ref.getDate()+o); return {work:work.replace(m[0],' '),date:n}; }
+    }
+    let m=work.match(/\b(?:next weekend|weekendul viitor|weekend viitor)\b/u);
+    if (m) { const n=nextWeekday(ref,6,true); n.setDate(n.getDate()+7); return {work:work.replace(m[0],' '),date:n}; }
+    m=work.match(/\b(?:this weekend|in weekend|în weekend|weekend)\b/u);
+    if (m) return {work:work.replace(m[0],' '),date:nextWeekday(ref,6,false)};
+
+    m=work.match(/\b(\d{1,2})[./-](\d{1,2})(?:[./-](\d{2,4}))?\b/u);
+    if (m) {
+        const day=Number(m[1]),mon=Number(m[2])-1;
+        let yr=m[3]?Number(m[3]):ref.getFullYear();
+        if(yr<100)yr+=2000;
+        const n=new Date(ref); n.setFullYear(yr,mon,day); n.setHours(9,0,0,0);
+        if(!m[3]&&n<ref) n.setFullYear(yr+1);
+        return {work:work.replace(m[0],' '),date:n};
+    }
+    m=work.match(/\bpe\s+(\d{1,2})\s+(ianuarie|februarie|martie|aprilie|mai|iunie|iulie|august|septembrie|octombrie|noiembrie|decembrie)(?:\s+(\d{4}))?\b/u);
+    if (m) {
+        const n=new Date(ref);
+        n.setFullYear(m[3]?Number(m[3]):ref.getFullYear(), months[m[2]], Number(m[1]));
+        n.setHours(9,0,0,0);
+        if(!m[3]&&n<ref) n.setFullYear(n.getFullYear()+1);
+        return {work:work.replace(m[0],' '),date:n};
+    }
+    m=work.match(/\b(?:on\s+)?(monday|tuesday|wednesday|thursday|friday|saturday|sunday|luni|marti|marți|miercuri|joi|vineri|sambata|sâmbătă|duminica|duminică)(?:\s+(?:next|viitoare?|urmatoare?|următor))?\b/u);
+    if (m) {
+        const skip=/next|viitoare|viitor|urmatoare|următor/.test(m[0]);
+        const wd=weekdays[m[1]];
+        if (wd) return {work:work.replace(m[0],' '),date:nextWeekday(ref,wd,skip)};
+    }
+    return null;
+}
+
+function extractTime(work) {
+    const pats=[
+        /\b(?:la|ora|at)\s*(\d{1,2})[:.](\d{2})\s*(?:am|pm)?\b/u,
+        /\b(\d{1,2})\s*:\s*(\d{2})\s*(?:am|pm)?\b/u,
+        /\b(?:la ora|la|at)\s*(\d{1,2})\s*(am|pm)?\b/u,
+        /\b(\d{1,2})\s+și\s+jumătate\b/u,
+        /\b(\d{1,2})\s+si\s+jumatate\b/u
+    ];
+    for (const pat of pats) {
+        const m=work.match(pat);
+        if (!m) continue;
+        let h=Number(m[1]),min=m[2]?(/^[0-5]\d$/.test(m[2])?Number(m[2]):0):0;
+        if(/jum|jumat/.test(m[0])) min=30;
+        if(/pm/i.test(m[0])&&h<12) h+=12;
+        if(/am/i.test(m[0])&&h===12) h=0;
+        if(h>=0&&h<=23&&min>=0&&min<=59) return {work:work.replace(m[0],' '),time:{hour:h,minute:min}};
+    }
+    const periods=[
+        {p:/\b(?:dimineața|dimineata|morning)\b/u,h:9,m:0},
+        {p:/\b(?:prânz|pranz|noon|midday)\b/u,h:12,m:0},
+        {p:/\b(?:după-amiază|dupa-amiaza|afternoon)\b/u,h:15,m:0},
+        {p:/\b(?:diseară|diseara|seara|evening)\b/u,h:19,m:0}
+    ];
+    for (const {p,h,m} of periods) {
+        if (p.test(work)) return {work:work.replace(p,' '),time:{hour:h,minute:m}};
+    }
+    return null;
+}
+
+function extractLocation(work) {
+    const m=work.match(/\b(?:la|în|in|at)\s+([a-z0-9ăâîșț\-.]+(?:\s+[a-z0-9ăâîșț\-.]+){0,3})\b/u);
+    if (!m) return null;
+    const blocked=['azi','astăzi','astazi','maine','mâine','tomorrow','weekend','ora','minute','ore','the','morning','noon','evening','today'];
+    const val=m[1].split(/\s+/).filter(w=>!blocked.includes(w)).join(' ').trim();
+    if (!val||/^\d/.test(val)) return null;
+    return {work:work.replace(m[0],' '),location:titleCase(val)};
+}
+
+function extractTitle(work) {
+    return work
+        .replace(/\b(?:trebuie|sa|să|iar|si|și|in|în|la|pe|the|a|an|to|for|at|on)\b/gu,' ')
+        .replace(/\s+/g,' ').trim().replace(/^[\-:,.;\s]+|[\-:,.;\s]+$/g,'');
+}
+
+function looksLikeTask(text,allDay) {
+    return allDay||/\b(trebuie|task|todo|to do|de facut|de făcut|buy|purchase|get|pick up)\b/u.test(text);
+}
+
+function parseRomanian(input) {
+    const ref=new Date();
+    let work=` ${normalize(input)} `;
+    const {work:w1,duration}=extractDuration(work); work=w1;
+    let date=null,time=null,allDay=false;
+    const rel=extractRelative(work,ref);
+    if (rel) { work=rel.work; date=rel.date; time={hour:date.getHours(),minute:date.getMinutes()}; }
+    else {
+        const dr=extractDate(work,ref);
+        if (dr) { work=dr.work; date=dr.date; }
+        const tr=extractTime(work);
+        if (tr) { work=tr.work; time=tr.time; }
+        if (!date&&time) { date=setTime(new Date(ref),time.hour,time.minute); if(date<ref) date.setDate(date.getDate()+1); }
+    }
+    if (!date) { date=new Date(ref); allDay=true; }
+    if (!time&&!rel) allDay=true;
+    let location=null;
+    const lr=extractLocation(work);
+    if (lr) { work=lr.work; location=lr.location; }
+    const title=extractTitle(work);
+    const type=looksLikeTask(normalize(input),allDay)?'task':'event';
+    const safeTitle=title?titleCase(title):(type==='task'?'New Task':'New Event');
+    let start=new Date(date),end;
+    if (allDay) { start.setHours(9,0,0,0); end=new Date(start); end.setDate(end.getDate()+1); }
+    else { start=setTime(date,time.hour,time.minute); end=addMinutes(start,duration); }
+    return {title:safeTitle,type,location,allDay,start,end,original:input.trim()};
+}
+
+// ============================================================
+// API EVENT MAPPING
+// ============================================================
+function stripTaskPrefix(s) {
+    const p=state.settings.taskPrefix||defaultSettings.taskPrefix;
+    return s.startsWith(p)?s.slice(p.length):s;
+}
+function mapApiEvent(ev) {
+    const allDay=Boolean(ev.start?.date&&!ev.start?.dateTime);
+    const typeFromMeta=ev.extendedProperties?.private?.calendarAiType;
+    const prefixed=(ev.summary||'').startsWith(state.settings.taskPrefix||defaultSettings.taskPrefix);
+    const type=typeFromMeta||(prefixed?'task':'event');
+    return {
+        id:ev.id,
+        title:stripTaskPrefix(ev.summary||'Untitled'),
+        type, location:ev.location||'', allDay,
+        start:allDay?`${ev.start.date}T09:00:00`:ev.start.dateTime,
+        end:allDay?`${ev.end.date}T09:00:00`:ev.end.dateTime,
+        original:ev.description||'', synced:true
+    };
+}
+function buildPayload(item) {
+    const title=item.type==='task'?`${state.settings.taskPrefix}${item.title}`:item.title;
+    const payload={
+        summary:title,
+        description:item.original?`Original: ${item.original}`:'',
+        location:item.location||'',
+        reminders:{useDefault:false,overrides:[{method:'popup',minutes:Math.max(1,Number(state.settings.notificationLeadMinutes||10))}]},
+        extendedProperties:{private:{calendarAiType:item.type}}
+    };
+    if (item.allDay) {
+        payload.start={date:dateKey(new Date(item.start))};
+        payload.end={date:dateKey(new Date(item.end))};
+    } else {
+        payload.start={dateTime:new Date(item.start).toISOString(),timeZone:APP_CONFIG.TIMEZONE};
+        payload.end={dateTime:new Date(item.end).toISOString(),timeZone:APP_CONFIG.TIMEZONE};
+    }
+    return payload;
+}
+
+// ============================================================
+// SESSION / SETTINGS
+// ============================================================
+function saveSession() {
+    localStorage.setItem(STORAGE_KEYS.session,JSON.stringify({
+        accessToken:state.accessToken,expiresAt:state.expiresAt,
+        profile:state.profile,wantsSession:state.wantsSession
+    }));
+}
+function loadSession() {
+    try {
+        const raw=localStorage.getItem(STORAGE_KEYS.session);
+        if (!raw) return;
+        const s=JSON.parse(raw);
+        state.accessToken=s.accessToken||''; state.expiresAt=Number(s.expiresAt||0);
+        state.profile=s.profile||null; state.wantsSession=Boolean(s.wantsSession);
+    } catch(_) { localStorage.removeItem(STORAGE_KEYS.session); }
+}
+function clearSession() {
+    state.accessToken=''; state.expiresAt=0; state.profile=null;
+    state.wantsSession=false; localStorage.removeItem(STORAGE_KEYS.session);
+}
+function saveSettings() {
+    localStorage.setItem(STORAGE_KEYS.settings,JSON.stringify(state.settings));
+}
+function loadSettings() {
+    try {
+        const raw=localStorage.getItem(STORAGE_KEYS.settings);
+        if (!raw) return;
+        state.settings={...defaultSettings,...JSON.parse(raw)};
+    } catch(_) { state.settings={...defaultSettings}; localStorage.removeItem(STORAGE_KEYS.settings); }
+}
+function applySettingsToUi() {
+    displayNameSetting.value=state.settings.displayName;
+    animationsSetting.checked=state.settings.animations;
+    if(defaultViewSetting) defaultViewSetting.value=state.settings.defaultView||'week';
+    soundEnabledSetting.checked=state.settings.soundEnabled;
+    soundVolumeSetting.value=String(state.settings.soundVolume);
+    notificationsSetting.checked=state.settings.notificationsEnabled;
+    notificationLeadSetting.value=String(state.settings.notificationLeadMinutes);
+    defaultDurationSetting.value=String(state.settings.defaultDuration);
+    taskPrefixSetting.value=state.settings.taskPrefix;
+    document.body.classList.toggle('reduced-motion',!state.settings.animations);
+    updateProfileUi();
+}
+function updateProfileUi() {
+    const name=state.settings.displayName||state.profile?.name||'Calendar User';
+    if(profileName) profileName.textContent=name;
+    if(profileEmail) profileEmail.textContent=state.profile?.email||'';
+    if(profilePhoto) { profilePhoto.src=state.profile?.picture||''; profilePhoto.classList.toggle('hidden',!state.profile?.picture); }
+    if(sessionLabel) sessionLabel.textContent=name;
+    const sp=document.getElementById('settingsPhoto');
+    if(sp) { sp.src=state.profile?.picture||''; sp.classList.toggle('hidden',!state.profile?.picture); }
+}
+function renderAuthView() {
+    const ok=Boolean(state.accessToken);
+    authView.style.display=ok?'none':'flex';
+    appView.style.display=ok?'block':'none';
+    updateProfileUi();
+}
+
+// ============================================================
+// FETCH
+// ============================================================
+async function fetchJson(url,opts={}) {
+    const res=await fetch(url,opts);
+    if (!res.ok) { const t=await res.text(); throw new Error(t||`HTTP ${res.status}`); }
+    if (res.status===204) return {};
+    const t=await res.text();
+    return t?JSON.parse(t):{};
+}
+async function fetchProfile() {
+    state.profile=await fetchJson('https://www.googleapis.com/oauth2/v3/userinfo',{
+        headers:{Authorization:`Bearer ${state.accessToken}`}
+    });
+}
+async function fetchMonthItems() {
+    calendarGrid.classList.add('fade-out');
+    const ms=startOfMonth(state.visibleMonth);
+    const me=endOfMonth(state.visibleMonth);
+    state.loadedMonthKey=`${ms.getFullYear()}-${pad(ms.getMonth()+1)}`;
+    // Expand range to cover partial weeks at edges
+    const extStart=new Date(ms); extStart.setDate(1-7);
+    const extEnd=new Date(me); extEnd.setDate(me.getDate()+7);
+    const params=new URLSearchParams({
+        singleEvents:'true',orderBy:'startTime',
+        timeMin:extStart.toISOString(),timeMax:extEnd.toISOString(),maxResults:'500'
+    });
+    try {
+        const data=await fetchJson(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(APP_CONFIG.CALENDAR_ID)}/events?${params}`,{
+            headers:{Authorization:`Bearer ${state.accessToken}`}
         });
-
-        logoutButton.addEventListener('click', () => {
-            clearNotificationTimers();
-            clearSession();
-            state.remoteItems = [];
-            renderView();
-            renderList();
-            renderCalendar();
-            setStatus(authStatus, '', '');
-            setStatus(appStatus, '', '');
-        });
-
-        settingsToggle.addEventListener('click', () => {
-            settingsModal.classList.add('open');
-        });
-
-        closeSettingsButton.addEventListener('click', () => {
-            settingsModal.classList.remove('open');
-        });
-
-        settingsModal.addEventListener('click', (event) => {
-            if (event.target === settingsModal) {
-                settingsModal.classList.remove('open');
-            }
-        });
-
-        submitButton.addEventListener('click', createItemFromInput);
-
-        phraseInput.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                createItemFromInput();
-            }
-        });
-
-        prevMonthButton.addEventListener('click', async () => {
-            state.visibleMonth = shiftMonth(state.visibleMonth, -1);
-            state.selectedDateKey = dateKey(state.visibleMonth);
-            await fetchMonthItems();
-        });
-
-        nextMonthButton.addEventListener('click', async () => {
-            state.visibleMonth = shiftMonth(state.visibleMonth, 1);
-            state.selectedDateKey = dateKey(state.visibleMonth);
-            await fetchMonthItems();
-        });
-
-        calendarGrid.addEventListener('click', (event) => {
-            const button = event.target.closest('[data-day]');
-            if (!button) return;
-            state.selectedDateKey = button.getAttribute('data-day');
-            renderCalendar();
-            renderList();
-        });
-
-        itemsBox.addEventListener('click', async (event) => {
-            const button = event.target.closest('[data-action]');
-            if (!button) return;
-            const itemId = button.getAttribute('data-id');
-            const action = button.getAttribute('data-action');
-
-            if (action === 'edit') {
-                openEditModal(itemId);
-            }
-
-            if (action === 'delete') {
-                openEditModal(itemId);
-            }
-        });
-
-        closeEditButton.addEventListener('click', closeEditModal);
-        saveEditButton.addEventListener('click', saveEditedItem);
-        deleteEditButton.addEventListener('click', deleteEditedItem);
-        editModal.addEventListener('click', (event) => {
-            if (event.target === editModal) {
-                closeEditModal();
-            }
-        });
-
-        notificationPermissionButton.addEventListener('click', requestNotificationPermission);
-
-        loadSession();
-        loadSettings();
-        applySettingsToUi();
-        bindSettings();
-        renderView();
+        state.remoteItems=(data.items||[]).map(mapApiEvent);
+    } catch(e) { console.error('Fetch failed',e); }
+    finally {
         renderCalendar();
-        renderList();
+        renderCurrentView();
+        scheduleNotifications();
+        setTimeout(()=>calendarGrid.classList.remove('fade-out'),50);
+    }
+}
 
-        window.addEventListener('load', () => {
-            initGoogle();
-            maybeRestoreSession();
+function getFilteredItems() {
+    return state.remoteItems.filter(item=>{
+        if (item.type==='event'&&!state.filterEvents) return false;
+        if (item.type==='task'&&!state.filterTasks) return false;
+        return true;
+    });
+}
+
+// ============================================================
+// VIEWS
+// ============================================================
+const HOUR_H = 60;             // px per hour
+const V_START = 7;             // visible range start: 7am
+const V_END = 23;              // visible range end: 11pm
+const HOURS = V_END - V_START;
+const INITIAL_SCROLL_HOUR = 8; // scroll calendar to this hour on load
+
+function initialScrollTo(wrapEl) {
+    if (wrapEl && wrapEl.scrollTop === 0) {
+        wrapEl.scrollTop = (INITIAL_SCROLL_HOUR - V_START) * HOUR_H;
+    }
+}
+
+function switchView(view) {
+    state.currentView=view;
+    document.querySelectorAll('.view-btn').forEach(b=>b.classList.toggle('active',b.dataset.view===view));
+    weekView.classList.toggle('hidden',view!=='week');
+    monthView.classList.toggle('hidden',view!=='month');
+    dayView.classList.toggle('hidden',view!=='day');
+    renderCurrentView();
+    updateMainTitle();
+}
+
+function updateMainTitle() {
+    if (state.currentView==='week') {
+        const ws=state.weekStart, we=new Date(ws);
+        we.setDate(we.getDate()+6);
+        const wm=ws.toLocaleString('en-US',{month:'long'}),em=we.toLocaleString('en-US',{month:'long'});
+        mainTitle.textContent=wm===em?`${wm} ${ws.getFullYear()}`:`${wm} – ${em} ${we.getFullYear()}`;
+    } else if (state.currentView==='month') {
+        mainTitle.textContent=formatMonth(state.visibleMonth);
+    } else {
+        mainTitle.textContent=formatLabel(parseDateKey(state.selectedDateKey));
+    }
+}
+
+function renderCurrentView() {
+    updateMainTitle();
+    if (state.currentView==='week') renderWeekView();
+    else if (state.currentView==='month') renderMonthView();
+    else renderDayView();
+}
+
+// ── Build time column ─────────────────────────────────────
+function buildTimeCol(colEl) {
+    colEl.style.height=`${HOURS*HOUR_H}px`;
+    let html='';
+    for (let h=V_START; h<=V_END; h++) {
+        const top=(h-V_START)*HOUR_H;
+        const lbl=h===0?'12 am':h<12?`${h} am`:h===12?'12 pm':`${h-12} pm`;
+        html+=`<div class="time-label" style="top:${top}px">${lbl}</div>`;
+    }
+    colEl.innerHTML=html;
+}
+
+// ── Position events in a column ──────────────────────────
+function buildEventsInCol(colEl, items, colHeightPx) {
+    colEl.style.position='relative';
+    colEl.style.height=`${colHeightPx}px`;
+    // Draw hour lines
+    let lines='';
+    for (let h=0; h<HOURS; h++) {
+        lines+=`<div class="hour-line" style="top:${h*HOUR_H}px"></div>`;
+    }
+    colEl.innerHTML=lines;
+    // Place events
+    items.forEach(item=>{
+        const s=new Date(item.start), e=new Date(item.end);
+        const startMin=s.getHours()*60+s.getMinutes();
+        const endMin=e.getHours()*60+e.getMinutes();
+        const topRaw=(startMin-V_START*60)*(HOUR_H/60);
+        const height=Math.max(18,(endMin-startMin)*(HOUR_H/60));
+        // Skip events entirely outside the visible time range
+        if (topRaw + height < 0 || topRaw >= HOURS*HOUR_H) return;
+        const top=Math.max(0,topRaw);
+        const color=getEvColor(item.id);
+        const card=document.createElement('div');
+        card.className='ev-card';
+        card.style.cssText=`top:${top}px;height:${height}px;background:${color.bg};color:${color.text};border-left-color:${color.text};`;
+        card.innerHTML=`<div class="ev-title">${item.title}</div>${height>30?`<div class="ev-time">${formatTime(item.start)}</div>`:''}`;
+        card.addEventListener('click',()=>openEditModal(item.id));
+        colEl.appendChild(card);
+    });
+}
+
+// ── WEEK VIEW ─────────────────────────────────────────────
+function renderWeekView() {
+    const DAY_NAMES=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    const todayKey=dateKey(new Date());
+    const days=[];
+    for (let i=0; i<7; i++) { const d=new Date(state.weekStart); d.setDate(d.getDate()+i); days.push(d); }
+
+    // Header
+    weekDaysHead.innerHTML=days.map((d,i)=>{
+        const k=dateKey(d), isToday=k===todayKey;
+        return `<div class="wdh ${isToday?'today-col':''}" data-day="${k}">
+            <div class="wdh-name">${DAY_NAMES[i]}</div>
+            <div class="wdh-num">${d.getDate()}</div></div>`;
+    }).join('');
+    weekDaysHead.querySelectorAll('.wdh').forEach(el=>{
+        el.addEventListener('click',()=>{ state.selectedDateKey=el.dataset.day; switchView('day'); });
+    });
+
+    // Time col
+    buildTimeCol(weekTimeCol);
+
+    // Day cols
+    const filtered=getFilteredItems();
+    weekCols.innerHTML='';
+    const colH=HOURS*HOUR_H;
+    days.forEach(d=>{
+        const k=dateKey(d), isToday=k===todayKey;
+        const col=document.createElement('div');
+        col.className=`week-day-col ${isToday?'today-col':''}`;
+        col.style.height=`${colH}px`;
+        const dayItems=filtered.filter(it=>dateKey(it.start)===k&&!it.allDay);
+        buildEventsInCol(col,dayItems,colH);
+        // Now line
+        if (isToday) {
+            const now=new Date(), nowMin=now.getHours()*60+now.getMinutes();
+            const top=(nowMin-V_START*60)*(HOUR_H/60);
+            if (top>=0&&top<=colH) {
+                const nl=document.createElement('div'); nl.className='now-line'; nl.style.top=`${top}px`;
+                col.appendChild(nl);
+            }
+        }
+        weekCols.appendChild(col);
+    });
+
+    // Scroll to initial hour
+    initialScrollTo(document.getElementById('weekBodyWrap'));
+}
+
+// ── MONTH VIEW ────────────────────────────────────────────
+function renderMonthView() {
+    const ms=startOfMonth(state.visibleMonth);
+    const firstDay=ms.getDay()===0?7:ms.getDay();
+    const gridStart=new Date(ms); gridStart.setDate(ms.getDate()-(firstDay-1));
+    const todayKey=dateKey(new Date());
+    const monthIdx=state.visibleMonth.getMonth();
+    const filtered=getFilteredItems();
+    let html='';
+    for (let i=0; i<42; i++) {
+        const cur=new Date(gridStart); cur.setDate(gridStart.getDate()+i);
+        const k=dateKey(cur);
+        const isToday=k===todayKey, isOther=cur.getMonth()!==monthIdx;
+        const dayItems=filtered.filter(it=>dateKey(it.start)===k).sort((a,b)=>new Date(a.start)-new Date(b.start));
+        const chips=dayItems.slice(0,3).map(it=>{
+            const c=getEvColor(it.id);
+            return `<div class="m-ev-chip" style="background:${c.bg};color:${c.text}" data-id="${it.id}">${it.title}</div>`;
+        }).join('');
+        const more=dayItems.length>3?`<div class="m-more">+${dayItems.length-3} more</div>`:'';
+        html+=`<div class="month-cell ${isToday?'today-cell':''} ${isOther?'other-month':''}" data-day="${k}">
+            <div class="m-day-num">${cur.getDate()}</div>
+            ${chips}${more}</div>`;
+    }
+    monthGrid.innerHTML=html;
+    monthGrid.querySelectorAll('.month-cell').forEach(el=>{
+        el.addEventListener('click',e=>{
+            const chipId=e.target.closest('[data-id]')?.dataset.id;
+            if (chipId) { openEditModal(chipId); return; }
+            state.selectedDateKey=el.dataset.day; switchView('day');
         });
+    });
+}
 
+// ── DAY VIEW ──────────────────────────────────────────────
+function renderDayView() {
+    const d=parseDateKey(state.selectedDateKey);
+    dayHeadDate.textContent=formatLabel(d);
+    buildTimeCol(dayTimeCol);
+    const filtered=getFilteredItems().filter(it=>dateKey(it.start)===state.selectedDateKey&&!it.allDay);
+    buildEventsInCol(dayEventsCol,filtered,HOURS*HOUR_H);
+    // Now line
+    const todayKey=dateKey(new Date());
+    if (state.selectedDateKey===todayKey) {
+        const now=new Date(), nowMin=now.getHours()*60+now.getMinutes();
+        const top=(nowMin-V_START*60)*(HOUR_H/60);
+        if (top>=0) {
+            const nl=document.createElement('div'); nl.className='now-line'; nl.style.top=`${top}px`;
+            dayEventsCol.appendChild(nl);
+        }
+    }
+    // Scroll to initial hour
+    initialScrollTo(dayEventsCol.closest('.day-body-wrap'));
+}
+
+// ── Mini calendar ─────────────────────────────────────────
+function renderCalendar() {
+    calendarTitle.textContent=formatMonth(state.visibleMonth);
+    const ms=startOfMonth(state.visibleMonth);
+    const firstDay=ms.getDay()===0?7:ms.getDay();
+    const gs=new Date(ms); gs.setDate(ms.getDate()-(firstDay-1));
+    const sel=state.selectedDateKey, todayKey=dateKey(new Date());
+    const monthIdx=state.visibleMonth.getMonth();
+    let html='';
+    for (let i=0;i<42;i++) {
+        const cur=new Date(gs); cur.setDate(gs.getDate()+i);
+        const k=dateKey(cur);
+        const dayItems=state.remoteItems.filter(it=>dateKey(it.start)===k);
+        const evs=dayItems.filter(it=>it.type==='event').length;
+        const tasks=dayItems.filter(it=>it.type==='task').length;
+        html+=`<button class="cal-day ${cur.getMonth()!==monthIdx?'muted':''} ${k===sel?'selected':''} ${k===todayKey?'today':''}" type="button" data-day="${k}">
+            ${cur.getDate()}
+            <span class="cal-dots">${evs?'<span class="dot event"></span>':''}${tasks?'<span class="dot task"></span>':''}</span>
+        </button>`;
+    }
+    calendarGrid.innerHTML=html;
+}
+
+// ============================================================
+// EDIT MODAL
+// ============================================================
+function openEditModal(itemId) {
+    const item=state.remoteItems.find(it=>it.id===itemId);
+    if (!item) return;
+    state.editingItemId=itemId;
+    editTitle.value=item.title;
+    editType.value=item.type;
+    editLocation.value=item.location||'';
+    editAllDay.checked=item.allDay;
+    editDate.value=dateKey(item.start);
+    editTime.value=item.allDay?'09:00':`${pad(new Date(item.start).getHours())}:${pad(new Date(item.start).getMinutes())}`;
+    setStatus(editStatusEl,'','');
+    editModal.classList.add('open');
+}
+function closeEditModal() {
+    editModal.classList.remove('open');
+    state.editingItemId=null;
+    setStatus(editStatusEl,'','');
+}
+
+// ============================================================
+// SOUND
+// ============================================================
+function playSound(freq=740,dur=0.08) {
+    if (!state.settings.soundEnabled) return;
+    const AC=window.AudioContext||window.webkitAudioContext;
+    if (!AC) return;
+    const ctx=new AC(), osc=ctx.createOscillator(), gain=ctx.createGain();
+    osc.type='sine'; osc.frequency.value=freq;
+    gain.gain.value=Math.max(0,Math.min(1,Number(state.settings.soundVolume||0.18)));
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(); osc.stop(ctx.currentTime+dur);
+    osc.onended=()=>ctx.close();
+}
+
+// ============================================================
+// NOTIFICATIONS
+// ============================================================
+function clearNotificationTimers() {
+    state.notificationTimers.forEach(t=>clearTimeout(t));
+    state.notificationTimers=[];
+}
+function scheduleNotifications() {
+    clearNotificationTimers();
+    if (!('Notification' in window)||!state.settings.notificationsEnabled||Notification.permission!=='granted') return;
+    const leadMs=Number(state.settings.notificationLeadMinutes||10)*60000;
+    const now=Date.now();
+    state.remoteItems.forEach(item=>{
+        const target=new Date(item.start).getTime()-leadMs;
+        if (target<=now||target-now>86400000) return;
+        const t=setTimeout(()=>{
+            new Notification(item.title,{body:`${item.type==='task'?'Task':'Event'} • ${formatTime(item.start)}`});
+            playSound(item.type==='task'?620:820,0.12);
+        },target-now);
+        state.notificationTimers.push(t);
+    });
+}
+
+// ============================================================
+// CREATE / EDIT / DELETE
+// ============================================================
+async function createItemFromInput() {
+    const text=phraseInput.value.trim();
+    if (!text) { setStatus(appStatus,'Please enter an event or task.','error'); return; }
+    const parsed=parseRomanian(text);
+    const payload=buildPayload({...parsed,start:parsed.start.toISOString(),end:parsed.end.toISOString()});
+    try {
+        await fetchJson(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(APP_CONFIG.CALENDAR_ID)}/events`,{
+            method:'POST',
+            headers:{Authorization:`Bearer ${state.accessToken}`,'Content-Type':'application/json'},
+            body:JSON.stringify(payload)
+        });
+        phraseInput.value='';
+        setStatus(appStatus,'Added!','success');
+        playSound(parsed.type==='task'?620:820);
+        setTimeout(()=>setStatus(appStatus,'',''),3000);
+        await fetchMonthItems();
+        phraseInput.focus();
+    } catch(e) { setStatus(appStatus,`Could not add: ${e.message}`,'error'); }
+}
+
+async function saveEditedItem() {
+    const item=state.remoteItems.find(it=>it.id===state.editingItemId);
+    if (!item) return;
+    const allDay=editAllDay.checked;
+    const dv=editDate.value||state.selectedDateKey, tv=editTime.value||'09:00';
+    const [yr,mo,dy]=dv.split('-').map(Number), [hr,mn]=tv.split(':').map(Number);
+    const startDate=new Date(yr,mo-1,dy,hr||9,mn||0,0);
+    const endDate=allDay?new Date(yr,mo-1,dy+1,9,0,0):addMinutes(startDate,Number(state.settings.defaultDuration||60));
+    const updated={...item,title:editTitle.value.trim()||item.title,type:editType.value,
+        location:editLocation.value.trim(),allDay,start:startDate.toISOString(),end:endDate.toISOString()};
+    try {
+        await fetchJson(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(APP_CONFIG.CALENDAR_ID)}/events/${encodeURIComponent(item.id)}`,{
+            method:'PATCH',
+            headers:{Authorization:`Bearer ${state.accessToken}`,'Content-Type':'application/json'},
+            body:JSON.stringify(buildPayload(updated))
+        });
+        playSound(760); closeEditModal(); await fetchMonthItems();
+    } catch(e) { setStatus(editStatusEl,`Could not save: ${e.message}`,'error'); }
+}
+
+async function deleteEditedItem() {
+    const item=state.remoteItems.find(it=>it.id===state.editingItemId);
+    if (!item) return;
+    try {
+        await fetchJson(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(APP_CONFIG.CALENDAR_ID)}/events/${encodeURIComponent(item.id)}`,{
+            method:'DELETE',headers:{Authorization:`Bearer ${state.accessToken}`}
+        });
+    } catch(e) { if (!/HTTP 204/i.test(e.message)) { setStatus(editStatusEl,`Could not delete: ${e.message}`,'error'); return; } }
+    playSound(480,0.12); closeEditModal(); await fetchMonthItems();
+}
+
+// ============================================================
+// SETTINGS BINDING
+// ============================================================
+function bindSettings() {
+    displayNameSetting.addEventListener('input',()=>{
+        state.settings.displayName=displayNameSetting.value.trim(); saveSettings(); updateProfileUi();
+    });
+    animationsSetting.addEventListener('change',()=>{
+        state.settings.animations=animationsSetting.checked; saveSettings(); applySettingsToUi();
+    });
+    defaultViewSetting?.addEventListener('change',()=>{
+        state.settings.defaultView=defaultViewSetting.value; saveSettings();
+    });
+    soundEnabledSetting.addEventListener('change',()=>{ state.settings.soundEnabled=soundEnabledSetting.checked; saveSettings(); });
+    soundVolumeSetting.addEventListener('change',()=>{
+        state.settings.soundVolume=Math.max(0,Math.min(1,Number(soundVolumeSetting.value||0.18)));
+        soundVolumeSetting.value=String(state.settings.soundVolume); saveSettings();
+    });
+    notificationsSetting.addEventListener('change',async()=>{
+        state.settings.notificationsEnabled=notificationsSetting.checked; saveSettings();
+        if (state.settings.notificationsEnabled&&Notification.permission!=='granted') await requestNotificationPermission();
+        scheduleNotifications();
+    });
+    notificationLeadSetting.addEventListener('change',()=>{
+        state.settings.notificationLeadMinutes=Math.max(1,Number(notificationLeadSetting.value||10));
+        notificationLeadSetting.value=String(state.settings.notificationLeadMinutes); saveSettings(); scheduleNotifications();
+    });
+    defaultDurationSetting.addEventListener('change',()=>{
+        state.settings.defaultDuration=Math.max(15,Number(defaultDurationSetting.value||60));
+        defaultDurationSetting.value=String(state.settings.defaultDuration); saveSettings();
+    });
+    taskPrefixSetting.addEventListener('change',()=>{
+        state.settings.taskPrefix=taskPrefixSetting.value||defaultSettings.taskPrefix;
+        saveSettings(); renderCalendar(); renderCurrentView();
+    });
+    testSoundButton.addEventListener('click',()=>playSound(740));
+    todayButton.addEventListener('click',async()=>{
+        state.visibleMonth=startOfMonth(new Date());
+        state.selectedDateKey=dateKey(new Date());
+        state.weekStart=getWeekStart(new Date());
+        await fetchMonthItems();
+    });
+}
+
+async function requestNotificationPermission() {
+    if (!('Notification' in window)) { setStatus(appStatus,'Browser does not support notifications.','error'); return; }
+    const r=await Notification.requestPermission();
+    if (r==='granted') { setStatus(appStatus,'Notifications enabled!','success'); scheduleNotifications(); }
+    else setStatus(appStatus,'Notifications were not permitted.','error');
+}
+
+// ============================================================
+// GOOGLE AUTH
+// ============================================================
+function initGoogle() {
+    if (state.tokenClient||typeof google==='undefined'||!google.accounts?.oauth2) return;
+    state.tokenClient=google.accounts.oauth2.initTokenClient({
+        client_id:APP_CONFIG.GOOGLE_CLIENT_ID,
+        scope:'openid email profile https://www.googleapis.com/auth/calendar',
+        callback:async(resp)=>{
+            if (!resp.access_token) { setStatus(authStatus,'Login failed.'); return; }
+            state.accessToken=resp.access_token;
+            state.expiresAt=Date.now()+Number(resp.expires_in||3600)*1000;
+            state.wantsSession=true;
+            try {
+                await fetchProfile(); saveSession(); renderAuthView(); applySettingsToUi();
+                state.weekStart=getWeekStart(new Date());
+                switchView(state.settings.defaultView||'week');
+                await fetchMonthItems();
+                fetchWeather();
+                phraseInput.focus();
+            } catch(e) { setStatus(authStatus,`Google error: ${e.message}`); }
+        },
+        error_callback:()=>setStatus(authStatus,'Google blocked the authentication.')
+    });
+}
+
+function maybeRestoreSession() {
+    if (state.accessToken&&state.expiresAt>Date.now()) {
+        renderAuthView(); applySettingsToUi();
+        state.weekStart=getWeekStart(new Date());
+        switchView(state.settings.defaultView||'week');
+        fetchMonthItems().catch(e=>setStatus(appStatus,e.message,'error'));
+        fetchWeather();
+        return;
+    }
+    if (!state.wantsSession) { clearSession(); renderAuthView(); return; }
+    initGoogle();
+    if (state.tokenClient) state.tokenClient.requestAccessToken({prompt:''});
+}
+
+// ============================================================
+// EVENT LISTENERS
+// ============================================================
+loginButton.addEventListener('click',()=>{
+    initGoogle();
+    if (state.tokenClient) state.tokenClient.requestAccessToken({prompt:'consent'});
+});
+logoutButton.addEventListener('click',()=>{
+    clearNotificationTimers(); clearSession(); state.remoteItems=[];
+    renderAuthView(); renderCalendar(); setStatus(authStatus,''); setStatus(appStatus,'');
+});
+
+// Settings modal
+settingsToggle.addEventListener('click',()=>settingsModal.classList.add('open'));
+closeSettingsButton.addEventListener('click',()=>settingsModal.classList.remove('open'));
+settingsModal.addEventListener('click',e=>{ if(e.target===settingsModal) settingsModal.classList.remove('open'); });
+
+// Edit modal
+closeEditButton.addEventListener('click',closeEditModal);
+saveEditButton.addEventListener('click',saveEditedItem);
+deleteEditButton.addEventListener('click',deleteEditedItem);
+editModal.addEventListener('click',e=>{ if(e.target===editModal) closeEditModal(); });
+
+// Quick add
+submitButton.addEventListener('click',createItemFromInput);
+phraseInput.addEventListener('keydown',e=>{ if(e.key==='Enter'){e.preventDefault();createItemFromInput();} });
+
+// Mini calendar navigation
+prevMonthButton.addEventListener('click',async()=>{
+    state.visibleMonth=shiftMonth(state.visibleMonth,-1);
+    state.selectedDateKey=dateKey(state.visibleMonth);
+    await fetchMonthItems();
+});
+nextMonthButton.addEventListener('click',async()=>{
+    state.visibleMonth=shiftMonth(state.visibleMonth,1);
+    state.selectedDateKey=dateKey(state.visibleMonth);
+    await fetchMonthItems();
+});
+calendarGrid.addEventListener('click',e=>{
+    const btn=e.target.closest('[data-day]');
+    if (!btn) return;
+    state.selectedDateKey=btn.getAttribute('data-day');
+    state.weekStart=getWeekStart(parseDateKey(state.selectedDateKey));
+    state.visibleMonth=startOfMonth(parseDateKey(state.selectedDateKey));
+    renderCalendar();
+    renderCurrentView();
+});
+
+// Main topbar navigation
+todayMainBtn.addEventListener('click',async()=>{
+    state.selectedDateKey=dateKey(new Date());
+    state.weekStart=getWeekStart(new Date());
+    state.visibleMonth=startOfMonth(new Date());
+    await fetchMonthItems();
+});
+prevBtn.addEventListener('click',async()=>{
+    if (state.currentView==='week') {
+        state.weekStart.setDate(state.weekStart.getDate()-7);
+        state.weekStart=new Date(state.weekStart);
+        state.visibleMonth=startOfMonth(state.weekStart);
+        await fetchMonthItems();
+    } else if (state.currentView==='month') {
+        state.visibleMonth=shiftMonth(state.visibleMonth,-1);
+        await fetchMonthItems();
+    } else {
+        const d=parseDateKey(state.selectedDateKey);
+        d.setDate(d.getDate()-1);
+        state.selectedDateKey=dateKey(d);
+        renderCalendar(); renderCurrentView();
+    }
+});
+nextBtn.addEventListener('click',async()=>{
+    if (state.currentView==='week') {
+        state.weekStart.setDate(state.weekStart.getDate()+7);
+        state.weekStart=new Date(state.weekStart);
+        state.visibleMonth=startOfMonth(state.weekStart);
+        await fetchMonthItems();
+    } else if (state.currentView==='month') {
+        state.visibleMonth=shiftMonth(state.visibleMonth,1);
+        await fetchMonthItems();
+    } else {
+        const d=parseDateKey(state.selectedDateKey);
+        d.setDate(d.getDate()+1);
+        state.selectedDateKey=dateKey(d);
+        renderCalendar(); renderCurrentView();
+    }
+});
+
+// View toggle
+document.querySelectorAll('.view-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>switchView(btn.dataset.view));
+});
+
+// Add event button – focus quick-add
+addEventBtn.addEventListener('click',()=>phraseInput.focus());
+
+// Mobile menu
+menuToggle.addEventListener('click',()=>{
+    sidebar.classList.toggle('open');
+    sbOverlay.classList.toggle('visible',sidebar.classList.contains('open'));
+});
+sbOverlay.addEventListener('click',()=>{
+    sidebar.classList.remove('open');
+    sbOverlay.classList.remove('visible');
+});
+
+// Sidebar collapsible sections
+[['myCalHead','myCalBody'],['catHead','catBody']].forEach(([headId,bodyId])=>{
+    const head=document.getElementById(headId), body=document.getElementById(bodyId);
+    if (!head||!body) return;
+    head.addEventListener('click',()=>{
+        const collapsed=body.classList.toggle('collapsed');
+        head.querySelector('.chev').style.transform=collapsed?'rotate(-90deg)':'';
+    });
+});
+
+// Filter checkboxes
+filterEventsEl?.addEventListener('change',()=>{ state.filterEvents=filterEventsEl.checked; renderCurrentView(); });
+filterTasksEl?.addEventListener('change',()=>{ state.filterTasks=filterTasksEl.checked; renderCurrentView(); });
+
+// ============================================================
+// INIT
+// ============================================================
+loadSession();
+loadSettings();
+applySettingsToUi();
+bindSettings();
+renderAuthView();
+renderCalendar();
+
+// Initial placeholder renders
+if (weekView) renderWeekView();
+
+window.addEventListener('load',()=>{
+    initGoogle();
+    maybeRestoreSession();
+});
+
+// Refresh now-line every minute
+setInterval(()=>{
+    if (state.currentView==='week'||state.currentView==='day') renderCurrentView();
+},60000);
 </script>
-
-<script type="text/javascript" src="/unprotected/back_to_spaceship.js?hash=4975d460e508829e8fb64d3962bc44ad35f3a95a"></script>
-
-</body>
-</html>
+</body></html>
