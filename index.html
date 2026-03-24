@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#0d0d11">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Calendar">
     <link rel="manifest" href="/manifest.json">
@@ -369,17 +370,6 @@
 
         /* Quick-add bar */
         .quick-add-bar { display: none; }
-        .quick-add-inner { display: flex; gap: 8px; }
-        .quick-add-input {
-            flex: 1; padding: 9px 14px;
-            background: rgba(255,255,255,0.82);
-            border: 1.5px solid rgba(0,0,0,0.1);
-            border-radius: 10px; color: var(--main-text);
-            font: inherit; font-size: 0.86rem; outline: none;
-            transition: border-color 0.15s, background 0.15s;
-        }
-        .quick-add-input::placeholder { color: #9ca3af; }
-        .quick-add-input:focus { border-color: var(--accent); background: #fff; }
         .btn-quick-add {
             padding: 9px 18px; background: var(--accent); color: #fff;
             border: none; border-radius: 10px; font: inherit;
@@ -1058,6 +1048,7 @@ const state = {
     currentView: 'week',
     weekStart: getWeekStart(new Date()),
     filterEvents: true, filterTasks: true,
+    // YYYY-MM-DD -> { icon, desc, label }
     weatherByDate: {}
 };
 
@@ -1190,6 +1181,14 @@ function formatTimeRange(startIso, endIso) {
 function formatDateShort(v) {
     return new Intl.DateTimeFormat('en-US',{weekday:'short',month:'short',day:'numeric'}).format(v);
 }
+function escapeHtml(v='') {
+    return String(v)
+        .replace(/&/g,'&amp;')
+        .replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;')
+        .replace(/'/g,'&#39;');
+}
 
 function getWeekStart(d) {
     const dt = new Date(d);
@@ -1242,10 +1241,10 @@ async function fetchWeather() {
         const {i, d} = wmoInfo(cw.weathercode);
         const temp = Math.round(cw.temperature);
         el.innerHTML = `
-            <span class="weather-icon">${i}</span>
+            <span class="weather-icon">${escapeHtml(i)}</span>
             <div class="weather-info">
                 <div class="weather-temp">${temp}°C</div>
-                <div class="weather-desc">${d}</div>
+                <div class="weather-desc">${escapeHtml(d)}</div>
             </div>`;
         state.weatherByDate = {};
         if (data.daily?.time?.length) {
@@ -1276,11 +1275,11 @@ async function fetchWeather() {
     }
 }
 
-function weatherBadgeMarkup(dateOrKey) {
+function weatherBadgeText(dateOrKey) {
     const key = typeof dateOrKey === 'string' ? dateOrKey : dateKey(dateOrKey);
     const w = state.weatherByDate[key];
     if (!w) return '';
-    return `<span class="weather-badge">${w.icon} ${w.label || w.desc}</span>`;
+    return `${w.icon} ${w.label || w.desc}`;
 }
 
 // ============================================================
@@ -1310,10 +1309,10 @@ function renderPhrasePreview() {
     try {
         const parsed = parseRomanian(text);
         phrasePreview.innerHTML = `
-            <div class="preview-pill"><div class="preview-label">Title</div><div class="preview-value">${parsed.title}</div></div>
-            <div class="preview-pill"><div class="preview-label">Type</div><div class="preview-value">${parsed.type}</div></div>
-            <div class="preview-pill"><div class="preview-label">Date</div><div class="preview-value">${formatDateShort(parsed.start)}</div></div>
-            <div class="preview-pill"><div class="preview-label">Time</div><div class="preview-value">${parsed.allDay ? 'All day' : formatTimeRange(parsed.start, parsed.end)}</div></div>`;
+            <div class="preview-pill"><div class="preview-label">Title</div><div class="preview-value">${escapeHtml(parsed.title)}</div></div>
+            <div class="preview-pill"><div class="preview-label">Type</div><div class="preview-value">${escapeHtml(parsed.type)}</div></div>
+            <div class="preview-pill"><div class="preview-label">Date</div><div class="preview-value">${escapeHtml(formatDateShort(parsed.start))}</div></div>
+            <div class="preview-pill"><div class="preview-label">Time</div><div class="preview-value">${escapeHtml(parsed.allDay ? 'All day' : formatTimeRange(parsed.start, parsed.end))}</div></div>`;
     } catch (_) {
         phrasePreview.innerHTML = `
             <div class="preview-pill"><div class="preview-label">Status</div><div class="preview-value">Could not parse yet</div></div>`;
@@ -1646,6 +1645,11 @@ const V_START = 7;             // visible range start: 7am
 const V_END = 23;              // visible range end: 11pm
 const HOURS = V_END - V_START;
 const INITIAL_SCROLL_HOUR = 8; // scroll calendar to this hour on load
+const DRAG_THRESHOLD_PX = 2;
+const TIME_SNAP_INTERVAL_MINUTES = 5;
+const EVENT_COL_LEFT_PCT = 1;
+const EVENT_COL_WIDTH_PCT = 98;
+const EVENT_OVERLAP_GAP_PCT = 0.8;
 
 function initialScrollTo(wrapEl) {
     if (wrapEl && wrapEl.scrollTop === 0) {
@@ -1737,12 +1741,22 @@ function buildEventsInCol(colEl, items, colHeightPx, options={}) {
         if (topRaw + height < 0 || topRaw >= HOURS*HOUR_H) return;
         const top=Math.max(0,topRaw);
         const color=getEvColor(item.id);
-        const widthPct=98/overlapCount;
-        const leftPct=1 + colIdx*widthPct;
+        const widthPct=EVENT_COL_WIDTH_PCT/overlapCount;
+        const leftPct=EVENT_COL_LEFT_PCT + colIdx*widthPct;
+        const eventWidthPct = Math.max(6,widthPct-EVENT_OVERLAP_GAP_PCT);
         const card=document.createElement('div');
         card.className='ev-card';
-        card.style.cssText=`top:${top}px;height:${height}px;left:${leftPct}%;width:${Math.max(6,widthPct-0.8)}%;background:${color.bg};color:${color.text};border-left-color:${color.text};`;
-        card.innerHTML=`<div class="ev-title">${item.title}</div>${height>30?`<div class="ev-time">${formatTime(item.start)}</div>`:''}`;
+        card.style.cssText=`top:${top}px;height:${height}px;left:${leftPct}%;width:${eventWidthPct}%;background:${color.bg};color:${color.text};border-left-color:${color.text};`;
+        const titleEl = document.createElement('div');
+        titleEl.className = 'ev-title';
+        titleEl.textContent = item.title;
+        card.appendChild(titleEl);
+        if (height > 30) {
+            const timeEl = document.createElement('div');
+            timeEl.className = 'ev-time';
+            timeEl.textContent = formatTime(item.start);
+            card.appendChild(timeEl);
+        }
         let moved = false;
         if (options.enableDrag) {
             card.addEventListener('pointerdown', e => beginDragEvent(e, card, item, colEl, options, ()=>{ moved=true; }));
@@ -1753,7 +1767,7 @@ function buildEventsInCol(colEl, items, colHeightPx, options={}) {
 }
 
 function clamp(v,min,max) { return Math.max(min,Math.min(max,v)); }
-function roundToStep(v,step=5) { return Math.round(v/step)*step; }
+function roundToStep(v,step=TIME_SNAP_INTERVAL_MINUTES) { return Math.round(v/step)*step; }
 
 function beginDragEvent(e, card, item, colEl, options, markMoved) {
     if (e.button!==0) return;
@@ -1761,6 +1775,7 @@ function beginDragEvent(e, card, item, colEl, options, markMoved) {
     const colRect = colEl.getBoundingClientRect();
     const startY = e.clientY;
     const startX = e.clientX;
+    const colWidth = colRect.width || 1;
     const origTop = parseFloat(card.style.top)||0;
     const cardHeight = parseFloat(card.style.height)||18;
     const minTop = 0;
@@ -1773,32 +1788,34 @@ function beginDragEvent(e, card, item, colEl, options, markMoved) {
     let currentTop = origTop;
     let dayShift = 0;
     let hasMoved = false;
+    const pointerId = e.pointerId;
     card.classList.add('dragging');
-    card.setPointerCapture?.(e.pointerId);
+    card.setPointerCapture?.(pointerId);
 
     const onMove = evt => {
         const dy = evt.clientY - startY;
         const dx = evt.clientX - startX;
-        if (Math.abs(dy) > 2 || Math.abs(dx) > 2) {
+        if (Math.abs(dy) > DRAG_THRESHOLD_PX || Math.abs(dx) > DRAG_THRESHOLD_PX) {
             hasMoved = true;
             markMoved();
         }
         currentTop = clamp(origTop + dy, minTop, maxTop);
         card.style.top = `${currentTop}px`;
         if (options.view === 'week' && weekDays.length) {
-            const shift = Math.round(dx / colRect.width);
+            const shift = Math.round(dx / colWidth);
+            // Clamp shift so drag cannot move before first day or after last visible day.
             dayShift = clamp(shift, -baseDayIdx, weekDays.length - baseDayIdx - 1);
         }
     };
     const onUp = async evt => {
         card.classList.remove('dragging');
-        card.releasePointerCapture?.(e.pointerId);
+        card.releasePointerCapture?.(pointerId);
         card.removeEventListener('pointermove', onMove);
         card.removeEventListener('pointerup', onUp);
         card.removeEventListener('pointercancel', onUp);
         if (!hasMoved) return;
         const minsFromStart = (currentTop / HOUR_H) * 60;
-        const startMins = roundToStep(V_START*60 + minsFromStart, 5);
+        const startMins = roundToStep(V_START*60 + minsFromStart);
         let targetDayKey = options.dayKey;
         if (options.view === 'week' && weekDays.length) {
             targetDayKey = dateKey(weekDays[baseDayIdx + dayShift]);
@@ -1815,7 +1832,7 @@ async function moveItemByDrag(itemId, targetDayKey, startMinutes, durationMin) {
     if (!item || !targetDayKey) return;
     const day = parseDateKey(targetDayKey);
     const hr = Math.floor(startMinutes/60);
-    const mn = Math.max(0,startMinutes%60);
+    const mn = startMinutes % 60;
     const startDate = new Date(day.getFullYear(), day.getMonth(), day.getDate(), hr, mn, 0, 0);
     const endDate = addMinutes(startDate, durationMin);
     const updated = {
@@ -1851,7 +1868,7 @@ function renderWeekView() {
         return `<div class="wdh ${isToday?'today-col':''}" data-day="${k}">
             <div class="wdh-name">${DAY_NAMES[i]}</div>
             <div class="wdh-num">${d.getDate()}</div>
-            <div class="wdh-weather">${w?`${w.icon} ${w.label || ''}`:''}</div></div>`;
+            <div class="wdh-weather">${w?`${escapeHtml(w.icon)} ${escapeHtml(w.label || '')}`:''}</div></div>`;
     }).join('');
     weekDaysHead.querySelectorAll('.wdh').forEach(el=>{
         el.addEventListener('click',()=>{ state.selectedDateKey=el.dataset.day; switchView('day'); });
@@ -1903,11 +1920,11 @@ function renderMonthView() {
         const dayItems=filtered.filter(it=>dateKey(it.start)===k).sort((a,b)=>new Date(a.start)-new Date(b.start));
         const chips=dayItems.slice(0,3).map(it=>{
             const c=getEvColor(it.id);
-            return `<div class="m-ev-chip" style="background:${c.bg};color:${c.text}" data-id="${it.id}">${it.title}</div>`;
+            return `<div class="m-ev-chip" style="background:${c.bg};color:${c.text}" data-id="${encodeURIComponent(it.id)}">${escapeHtml(it.title)}</div>`;
         }).join('');
         const more=dayItems.length>3?`<div class="m-more">+${dayItems.length-3} more</div>`:'';
         const w = state.weatherByDate[k];
-        const weather = w ? `<div class="m-weather">${w.icon} ${w.label || w.desc}</div>` : `<div class="m-weather"></div>`;
+        const weather = w ? `<div class="m-weather">${escapeHtml(w.icon)} ${escapeHtml(w.label || w.desc)}</div>` : `<div class="m-weather"></div>`;
         html+=`<div class="month-cell ${isToday?'today-cell':''} ${isOther?'other-month':''}" data-day="${k}">
             <div class="m-day-num">${cur.getDate()}</div>
             ${weather}
@@ -1917,7 +1934,7 @@ function renderMonthView() {
     monthGrid.querySelectorAll('.month-cell').forEach(el=>{
         el.addEventListener('click',e=>{
             const chipId=e.target.closest('[data-id]')?.dataset.id;
-            if (chipId) { openEditModal(chipId); return; }
+            if (chipId) { openEditModal(decodeURIComponent(chipId)); return; }
             state.selectedDateKey=el.dataset.day; switchView('day');
         });
     });
@@ -1926,7 +1943,14 @@ function renderMonthView() {
 // ── DAY VIEW ──────────────────────────────────────────────
 function renderDayView() {
     const d=parseDateKey(state.selectedDateKey);
-    dayHeadDate.innerHTML=`<span>${formatLabel(d)}</span>${weatherBadgeMarkup(state.selectedDateKey)}`;
+    dayHeadDate.textContent = formatLabel(d);
+    const weatherTxt = weatherBadgeText(state.selectedDateKey);
+    if (weatherTxt) {
+        const weatherEl = document.createElement('span');
+        weatherEl.className = 'weather-badge';
+        weatherEl.textContent = weatherTxt;
+        dayHeadDate.appendChild(weatherEl);
+    }
     buildTimeCol(dayTimeCol);
     const filtered=getFilteredItems().filter(it=>dateKey(it.start)===state.selectedDateKey&&!it.allDay);
     buildEventsInCol(dayEventsCol,filtered,HOURS*HOUR_H,{enableDrag:true,view:'day',dayKey:state.selectedDateKey});
@@ -2291,15 +2315,17 @@ sbOverlay.addEventListener('click',()=>{
     sbOverlay.classList.remove('visible');
 });
 
-// Sidebar collapsible sections
-[['myCalHead','myCalBody']].forEach(([headId,bodyId])=>{
-    const head=document.getElementById(headId), body=document.getElementById(bodyId);
-    if (!head||!body) return;
-    head.addEventListener('click',()=>{
-        const collapsed=body.classList.toggle('collapsed');
-        head.querySelector('.chev').style.transform=collapsed?'rotate(-90deg)':'';
-    });
-});
+// Sidebar collapsible section
+{
+    const head=document.getElementById('myCalHead');
+    const body=document.getElementById('myCalBody');
+    if (head && body) {
+        head.addEventListener('click',()=>{
+            const collapsed=body.classList.toggle('collapsed');
+            head.querySelector('.chev').style.transform=collapsed?'rotate(-90deg)':'';
+        });
+    }
+}
 
 // Filter checkboxes
 filterEventsEl?.addEventListener('change',()=>{ state.filterEvents=filterEventsEl.checked; renderCurrentView(); });
@@ -2323,7 +2349,7 @@ window.addEventListener('load',()=>{
     initGoogle();
     maybeRestoreSession();
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js').catch(()=>{});
+        navigator.serviceWorker.register('/sw.js').catch(err=>console.warn('SW registration failed', err));
     }
 });
 

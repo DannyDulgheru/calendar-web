@@ -1,9 +1,12 @@
 const CACHE_NAME = 'calendar-web-v1';
-const ASSETS = ['/', '/index.html', '/manifest.json'];
+const ASSETS = ['/index.html', '/manifest.json'];
 
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting())
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(ASSETS))
+      .then(() => self.skipWaiting())
+      .catch(err => console.warn('SW install cache failed', err))
   );
 });
 
